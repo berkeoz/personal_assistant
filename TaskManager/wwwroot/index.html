@@ -221,6 +221,9 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
 #toast{position:fixed;bottom:20px;right:20px;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:10px 18px;border-radius:8px;font-size:13px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:999}
 #toast.show{opacity:1}
 .empty{color:var(--muted);text-align:center;padding:40px;font-size:13px}
+.task-notes{font-size:12px;color:var(--muted);margin-top:4px;padding:6px 10px;background:var(--surface2);border-radius:6px;white-space:pre-wrap;line-height:1.5}
+.notes-toggle{background:none;border:none;color:var(--muted);cursor:pointer;font-size:11px;padding:2px 6px;border-radius:4px;transition:color .15s}
+.notes-toggle:hover{color:var(--accent)}
 </style>
 </head>
 <body>
@@ -400,6 +403,7 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
     </div>
     <div class="field"><label>Due Date</label><input id="mt-due" type="date"/></div>
     <div class="field"><label>Tags (comma separated)</label><input id="mt-tags" placeholder="work, urgent…"/></div>
+    <div class="field"><label>Notes</label><textarea id="mt-notes" rows="4" placeholder="Add notes, links, details…" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--text);font-size:13px;outline:none;resize:vertical;font-family:inherit;transition:border-color .15s"></textarea></div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeModal('modal-task')">Cancel</button>
       <button class="btn btn-primary" onclick="saveEditTask()">Save</button>
@@ -442,10 +446,14 @@ function openModal(id){ document.getElementById(id).classList.add('open') }
 function closeModal(id){ document.getElementById(id).classList.remove('open') }
 function findTask(id){ return data.tasks.find(t=>t.id===id) }
 function findProject(id){ return data.projects.find(p=>p.id===id) }
-function isOverdue(t){ return t.dueDate && t.status!=='done' && new Date(t.dueDate)<new Date() }
-function isToday(t){ if(!t.dueDate) return false; const d=new Date(t.dueDate); const n=new Date(); return d.toDateString()===n.toDateString() }
-function fmtDate(d){ if(!d) return ''; return new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) }
-function fmtDatetime(d){ if(!d) return ''; const dt=new Date(d); return dt.toLocaleDateString('en-US',{month:'short',day:'numeric'})+' '+dt.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'}) }
+// Parse date strings as LOCAL time (avoid UTC-shift showing wrong day)
+function parseDate(s){ if(!s) return null; return s.length===10 ? new Date(s+'T00:00:00') : new Date(s) }
+// A task is visually "completed" if its column name suggests done/archived
+function isCompleted(t){ const col=colById(t.status); if(!col) return false; const n=col.name.toLowerCase(); return n==='done'||n.includes('archive')||n.includes('complet') }
+function isOverdue(t){ return t.dueDate && !isCompleted(t) && parseDate(t.dueDate)<new Date() }
+function isToday(t){ if(!t.dueDate) return false; const d=parseDate(t.dueDate); const n=new Date(); return d.toDateString()===n.toDateString() }
+function fmtDate(s){ if(!s) return ''; return parseDate(s).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) }
+function fmtDatetime(s){ if(!s) return ''; const dt=parseDate(s); return dt.toLocaleDateString('en-US',{month:'short',day:'numeric'})+' '+dt.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'}) }
 function taskProjects(t){ return (t.projectIds||[]).map(id=>findProject(id)).filter(Boolean) }
 function colById(id){ return data.columns.find(c=>c.id===id) }
 function statusLabel(colId){ return colById(colId)?.name || colId }
@@ -563,16 +571,23 @@ function renderSidebarStats(){
 
 // ── Task item HTML ─────────────────────────────
 function taskItemHTML(t){
-  const over=isOverdue(t), tod=isToday(t);
+  const over=isOverdue(t), tod=isToday(t), done=isCompleted(t);
   const dueLabel = over?`⚠ ${fmtDate(t.dueDate)}`:tod?'Today':t.dueDate?fmtDate(t.dueDate):'';
   const dueClass = over?'overdue':tod?'today':'';
   const projs = taskProjects(t);
   const col = colById(t.status);
-  const statusCls = t.status==='done'?'status-done':t.status==='todo'?'status-todo':'status-inprogress';
-  return `<div class="task-item ${t.status==='done'?'done':''} ${over?'overdue':''}">
-    <input class="task-cb" type="checkbox" ${t.status==='done'?'checked':''}
+  const statusCls = done?'status-done':t.status==='todo'?'status-todo':'status-inprogress';
+  const hasNotes = t.notes && t.notes.trim();
+  return `<div class="task-item ${done?'done':''} ${over?'overdue':''}">
+    <input class="task-cb" type="checkbox" ${done?'checked':''}
       onchange="toggleTask('${t.id}')"/>
-    <span class="task-text">${esc(t.text)}</span>
+    <div style="flex:1;min-width:0">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <span class="task-text">${esc(t.text)}</span>
+        ${hasNotes?`<button class="notes-toggle" onclick="toggleNotes('${t.id}')">📋 notes</button>`:''}
+      </div>
+      ${hasNotes?`<div class="task-notes" id="tn-${t.id}" style="display:none">${esc(t.notes)}</div>`:''}
+    </div>
     <div class="task-meta">
       ${(t.tags||[]).map(tg=>`<span class="tag">#${esc(tg)}</span>`).join('')}
       ${projs.map(p=>`<span class="proj-tag" style="background:${p.color}">${esc(p.name)}</span>`).join('')}
@@ -583,14 +598,14 @@ function taskItemHTML(t){
     </div>
   </div>`;
 }
+function toggleNotes(id){ const el=document.getElementById('tn-'+id); if(el) el.style.display=el.style.display==='none'?'block':'none'; }
 
 async function toggleTask(id){
   const t = findTask(id); if(!t) return;
   const cols = data.columns;
-  const lastCol = cols[cols.length - 1];
+  const doneCol = cols.find(c=>{ const n=c.name.toLowerCase(); return n==='done'||n.includes('archive')||n.includes('complet') }) || cols[cols.length-1];
   const firstCol = cols[0];
-  const isDone = t.status === lastCol?.id;
-  await patchTask(id, { status: isDone ? firstCol.id : lastCol.id });
+  await patchTask(id, { status: isCompleted(t) ? firstCol.id : doneCol.id });
 }
 async function confirmDel(id){ if(confirm('Delete this task?')){ await delTask(id); toast('Deleted') } }
 
@@ -628,6 +643,7 @@ function openEditTask(id){
   document.getElementById('mt-status').innerHTML = data.columns.map(c=>`<option value="${c.id}" ${t.status===c.id?'selected':''}>${esc(c.name)}</option>`).join('');
   document.getElementById('mt-due').value=t.dueDate?t.dueDate.slice(0,10):'';
   document.getElementById('mt-tags').value=(t.tags||[]).join(', ');
+  document.getElementById('mt-notes').value=t.notes||'';
   // project checkboxes
   document.getElementById('mt-proj-list').innerHTML = data.projects.map(p=>`
     <label class="proj-check-item">
@@ -643,7 +659,8 @@ async function saveEditTask(){
   const due=document.getElementById('mt-due').value;
   const tags=document.getElementById('mt-tags').value.split(',').map(s=>s.trim()).filter(Boolean);
   const pids=[...document.querySelectorAll('#mt-proj-list input:checked')].map(i=>i.value);
-  await patchTask(editingTaskId,{text,status,dueDate:due||null,tags,projectIds:pids});
+  const notes=document.getElementById('mt-notes').value.trim();
+  await patchTask(editingTaskId,{text,status,dueDate:due||null,tags,projectIds:pids,notes:notes||null});
   closeModal('modal-task'); toast('Saved');
 }
 
