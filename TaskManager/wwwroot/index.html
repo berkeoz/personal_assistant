@@ -456,6 +456,7 @@ function initMpick(ns){ if(!mpickState[ns]) mpickState[ns]={selected:new Set()} 
 function buildMpickDD(ns){
   initMpick(ns);
   const dd = document.getElementById(ns+'-mpick-dd');
+  if(!dd) return;
   dd.innerHTML = data.projects.map(p=>`
     <div class="mpick-option" onclick="toggleMpickItem('${ns}','${p.id}',this)">
       <input type="checkbox" id="mpck-${ns}-${p.id}" ${mpickState[ns].selected.has(p.id)?'checked':''}/>
@@ -585,11 +586,11 @@ function taskItemHTML(t){
 
 async function toggleTask(id){
   const t = findTask(id); if(!t) return;
-  // cycle through columns: todo→next→…→done→todo
   const cols = data.columns;
-  const idx = cols.findIndex(c=>c.id===t.status);
-  const next = cols[(idx+1)%cols.length];
-  await patchTask(id,{status:next.id});
+  const lastCol = cols[cols.length - 1];
+  const firstCol = cols[0];
+  const isDone = t.status === lastCol?.id;
+  await patchTask(id, { status: isDone ? firstCol.id : lastCol.id });
 }
 async function confirmDel(id){ if(confirm('Delete this task?')){ await delTask(id); toast('Deleted') } }
 
@@ -597,8 +598,6 @@ async function confirmDel(id){ if(confirm('Delete this task?')){ await delTask(i
 function setListFilter(f,btn){ listFilter=f; document.querySelectorAll('#view-list .chip').forEach(c=>c.classList.remove('active')); btn.classList.add('active'); renderList() }
 
 function renderList(){
-  // populate mpick
-  buildMpickDD('li');
   const now=new Date();
   let tasks=data.tasks;
   if(listFilter==='todo') tasks=tasks.filter(t=>t.status==='todo');
@@ -606,6 +605,7 @@ function renderList(){
   else if(listFilter==='done') tasks=tasks.filter(t=>t.status==='done');
   else if(listFilter==='overdue') tasks=tasks.filter(t=>isOverdue(t));
   document.getElementById('task-list').innerHTML = tasks.length ? tasks.map(taskItemHTML).join('') : `<div class="empty">No tasks here.</div>`;
+  buildMpickDD('li');
 }
 
 async function addTask(){
