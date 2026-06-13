@@ -717,7 +717,7 @@ async function deleteColumn(id){
   await load(); toast('Column deleted');
 }
 
-let selectedColColor=COLORS[0];
+
 function openNewColumnModal(){
   document.getElementById('mc-name').value='';
   selectedColColor=COLORS[0];
@@ -874,7 +874,7 @@ async function deleteCurrentProject(){
 }
 
 // ── New Project Modal ──────────────────────────
-let selectedColor=COLORS[0];
+
 function openNewProjectModal(){
   document.getElementById('mp-name').value=''; selectedColor=COLORS[0];
   document.getElementById('color-row').innerHTML=COLORS.map(c=>`<div class="color-swatch ${c===selectedColor?'selected':''}" style="background:${c}" onclick="selectColor('${c}',this)"></div>`).join('');
