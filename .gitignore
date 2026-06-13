@@ -1,0 +1,5 @@
+TaskManager/bin/
+TaskManager/obj/
+TaskManager/tasks.md
+*.user
+.vs/
