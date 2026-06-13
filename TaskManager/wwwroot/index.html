@@ -172,6 +172,42 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
 .empty{color:var(--muted);text-align:center;padding:40px;font-size:13px}
 .separator{border:none;border-top:1px solid var(--border)}
 
+/* ── Calendar ── */
+.cal-wrap{display:flex;gap:16px;align-items:start}
+.cal-grid-wrap{flex:1;min-width:0;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.cal-header{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--border)}
+.cal-header h3{flex:1;font-size:15px;font-weight:600;text-align:center}
+.cal-nav{background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;padding:2px 8px;border-radius:6px;transition:background .15s,color .15s}
+.cal-nav:hover{background:var(--surface2);color:var(--text)}
+.cal-today-btn{background:var(--surface2);border:1px solid var(--border);color:var(--text);cursor:pointer;font-size:12px;padding:4px 12px;border-radius:6px;transition:background .15s}
+.cal-today-btn:hover{background:var(--surface3)}
+.cal-day-names{display:grid;grid-template-columns:repeat(7,1fr);border-bottom:1px solid var(--border)}
+.cal-day-name{text-align:center;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;padding:8px 0}
+.cal-days{display:grid;grid-template-columns:repeat(7,1fr)}
+.cal-cell{min-height:80px;border-right:1px solid var(--border);border-bottom:1px solid var(--border);padding:6px;cursor:pointer;transition:background .15s;position:relative}
+.cal-cell:nth-child(7n){border-right:none}
+.cal-cell:hover{background:var(--surface2)}
+.cal-cell.other-month .cal-num{color:var(--surface3)}
+.cal-cell.today .cal-num{background:var(--accent);color:#fff;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center}
+.cal-cell.selected{background:var(--surface2);outline:2px solid var(--accent)}
+.cal-num{font-size:12px;font-weight:600;color:var(--muted);width:22px;height:22px;display:flex;align-items:center;justify-content:center;margin-bottom:3px}
+.cal-dots{display:flex;flex-direction:column;gap:2px}
+.cal-dot{font-size:10px;padding:1px 5px;border-radius:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#fff;line-height:1.4}
+.cal-dot.overdue{outline:1px solid var(--red)}
+.cal-dot.done{opacity:.45}
+.cal-more{font-size:10px;color:var(--muted);padding-left:2px;margin-top:1px}
+/* Day panel */
+.cal-day-panel{width:280px;flex-shrink:0;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;display:flex;flex-direction:column;gap:10px}
+.cal-day-panel h4{font-size:13px;font-weight:600;color:var(--text)}
+.cal-day-panel .add-row{flex-direction:column;gap:6px}
+.cal-day-panel .add-row input,.cal-day-panel .add-row select{width:100%}
+.cal-panel-tasks{display:flex;flex-direction:column;gap:6px}
+.cal-task{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px 12px;display:flex;align-items:center;gap:8px;transition:border-color .15s}
+.cal-task:hover{border-color:var(--accent)}
+.cal-task.done .cal-task-text{text-decoration:line-through;opacity:.5}
+.cal-task-text{flex:1;font-size:12px}
+.cal-task-proj{font-size:10px;padding:1px 6px;border-radius:8px;color:#fff;flex-shrink:0}
+
 /* ── Search results ── */
 .search-section-label{font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:6px;padding-left:2px}
 .search-hit{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;display:flex;align-items:center;gap:10px;margin-bottom:5px;cursor:pointer;transition:border-color .15s}
@@ -198,6 +234,7 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
   <button class="nav-btn active" onclick="switchView('list',this)" data-view="list"><span class="ic">✅</span> All Tasks</button>
   <button class="nav-btn" onclick="switchView('kanban',this)" data-view="kanban"><span class="ic">📋</span> Kanban</button>
   <button class="nav-btn" onclick="switchView('schedule',this)" data-view="schedule"><span class="ic">📅</span> Schedule</button>
+  <button class="nav-btn" onclick="switchView('calendar',this)" data-view="calendar"><span class="ic">🗓</span> Calendar</button>
   <button class="nav-btn" onclick="switchView('summary',this)" data-view="summary"><span class="ic">📊</span> Summary</button>
 
   <div class="nav-section">Projects</div>
@@ -292,6 +329,36 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
       <button class="chip" onclick="setPdFilter('done',this)">Done</button>
     </div>
     <div class="task-list" id="pd-task-list"></div>
+  </div>
+
+  <!-- Calendar -->
+  <div class="view" id="view-calendar">
+    <div class="cal-wrap">
+      <div class="cal-grid-wrap">
+        <div class="cal-header">
+          <button class="cal-nav" onclick="calNav(-1)">‹</button>
+          <h3 id="cal-title"></h3>
+          <button class="cal-nav" onclick="calNav(1)">›</button>
+          <button class="cal-today-btn" onclick="calGoToday()">Today</button>
+        </div>
+        <div class="cal-day-names">
+          <div class="cal-day-name">Sun</div><div class="cal-day-name">Mon</div>
+          <div class="cal-day-name">Tue</div><div class="cal-day-name">Wed</div>
+          <div class="cal-day-name">Thu</div><div class="cal-day-name">Fri</div>
+          <div class="cal-day-name">Sat</div>
+        </div>
+        <div class="cal-days" id="cal-days"></div>
+      </div>
+      <div class="cal-day-panel" id="cal-day-panel">
+        <h4 id="cal-panel-title">Select a day</h4>
+        <div class="add-row" id="cal-add-row" style="display:none;flex-direction:column;gap:6px">
+          <input id="cal-task-text" type="text" placeholder="Add task for this day… (Enter)" style="width:100%"/>
+          <select id="cal-task-proj" style="width:100%"></select>
+          <button class="btn btn-primary" style="width:100%" onclick="addCalTask()">+ Add</button>
+        </div>
+        <div class="cal-panel-tasks" id="cal-panel-tasks"><div class="empty" style="padding:20px 0">Click a day to see tasks</div></div>
+      </div>
+    </div>
   </div>
 
   <!-- Search Results -->
@@ -426,6 +493,7 @@ function renderView(name){
   if(name==='list') renderList();
   else if(name==='kanban') renderKanban();
   else if(name==='schedule') renderSchedule();
+  else if(name==='calendar') renderCalendar();
   else if(name==='projects') renderProjects();
   else if(name==='project-detail') renderProjectDetail();
   else if(name==='summary') renderSummary();
@@ -720,6 +788,107 @@ function renderSummary(){
 
 // ── Close modals on overlay click ─────────────
 document.querySelectorAll('.modal-overlay').forEach(o=>o.addEventListener('click',e=>{ if(e.target===o) o.classList.remove('open') }));
+
+// ── Calendar ──────────────────────────────────
+let calYear = new Date().getFullYear();
+let calMonth = new Date().getMonth();
+let calSelectedDate = null;
+
+function renderCalendar() {
+  const now = new Date();
+  const firstDay = new Date(calYear, calMonth, 1);
+  const lastDay = new Date(calYear, calMonth + 1, 0);
+  const startOffset = firstDay.getDay();
+
+  document.getElementById('cal-title').textContent =
+    firstDay.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+  // build a map: "YYYY-MM-DD" -> [tasks]
+  const taskMap = {};
+  allTasks().forEach(t => {
+    if (!t.dueDate) return;
+    const key = t.dueDate.slice(0, 10);
+    if (!taskMap[key]) taskMap[key] = [];
+    taskMap[key].push(t);
+  });
+
+  const todayStr = now.toISOString().slice(0, 10);
+  let html = '';
+
+  // leading blanks from previous month
+  const prevLast = new Date(calYear, calMonth, 0).getDate();
+  for (let i = startOffset - 1; i >= 0; i--) {
+    const d = prevLast - i;
+    html += `<div class="cal-cell other-month"><div class="cal-num">${d}</div></div>`;
+  }
+
+  // current month days
+  for (let d = 1; d <= lastDay.getDate(); d++) {
+    const dateStr = `${calYear}-${String(calMonth + 1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const isToday = dateStr === todayStr;
+    const isSelected = dateStr === calSelectedDate;
+    const tasks = taskMap[dateStr] || [];
+    const MAX_SHOW = 3;
+    const dots = tasks.slice(0, MAX_SHOW).map(t =>
+      `<div class="cal-dot ${t.status==='done'?'done':new Date(t.dueDate)<now&&t.status!=='done'?'overdue':''}"
+        style="background:${t._project.color}">${esc(t.text)}</div>`
+    ).join('');
+    const more = tasks.length > MAX_SHOW ? `<div class="cal-more">+${tasks.length - MAX_SHOW} more</div>` : '';
+    html += `<div class="cal-cell ${isToday?'today':''} ${isSelected?'selected':''}" onclick="calSelectDay('${dateStr}')">
+      <div class="cal-num">${d}</div>
+      <div class="cal-dots">${dots}${more}</div>
+    </div>`;
+  }
+
+  // trailing blanks
+  const totalCells = startOffset + lastDay.getDate();
+  const trailing = totalCells % 7 === 0 ? 0 : 7 - (totalCells % 7);
+  for (let d = 1; d <= trailing; d++) {
+    html += `<div class="cal-cell other-month"><div class="cal-num">${d}</div></div>`;
+  }
+
+  document.getElementById('cal-days').innerHTML = html;
+}
+
+function calNav(dir) { calMonth += dir; if (calMonth > 11) { calMonth = 0; calYear++; } else if (calMonth < 0) { calMonth = 11; calYear--; } renderCalendar(); }
+function calGoToday() { const n = new Date(); calYear = n.getFullYear(); calMonth = n.getMonth(); renderCalendar(); calSelectDay(n.toISOString().slice(0,10)); }
+
+function calSelectDay(dateStr) {
+  calSelectedDate = dateStr;
+  renderCalendar();
+
+  const dt = new Date(dateStr + 'T00:00:00');
+  document.getElementById('cal-panel-title').textContent =
+    dt.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+
+  // populate project select
+  const sel = document.getElementById('cal-task-proj');
+  sel.innerHTML = data.projects.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join('');
+  document.getElementById('cal-add-row').style.display = 'flex';
+
+  const tasks = allTasks().filter(t => t.dueDate && t.dueDate.slice(0,10) === dateStr);
+  const el = document.getElementById('cal-panel-tasks');
+  if (!tasks.length) { el.innerHTML = `<div class="empty" style="padding:16px 0">No tasks this day.</div>`; return; }
+  el.innerHTML = tasks.map(t => `
+    <div class="cal-task ${t.status==='done'?'done':''}">
+      <input class="task-cb" type="checkbox" ${t.status==='done'?'checked':''} onchange="toggleTask('${t.id}').then(()=>calSelectDay('${dateStr}'))"/>
+      <span class="cal-task-text">${esc(t.text)}</span>
+      <span class="cal-task-proj" style="background:${t._project.color}">${esc(t._project.name)}</span>
+      <button class="task-del" onclick="deleteTask('${t.id}').then(()=>calSelectDay('${dateStr}'))">×</button>
+    </div>`).join('');
+}
+
+async function addCalTask() {
+  const text = document.getElementById('cal-task-text').value.trim();
+  const projId = document.getElementById('cal-task-proj').value;
+  if (!text || !projId || !calSelectedDate) return;
+  await fetch(`${API}/projects/${projId}/tasks`, { method: 'POST', body: JSON.stringify({ text, dueDate: calSelectedDate, status: 'todo' }), headers: { 'Content-Type': 'application/json' } });
+  document.getElementById('cal-task-text').value = '';
+  await load();
+  calSelectDay(calSelectedDate);
+  toast('Task added');
+}
+document.getElementById('cal-task-text').addEventListener('keydown', e => { if (e.key === 'Enter') addCalTask(); });
 
 // ── Search ────────────────────────────────────
 let lastView = 'list';
