@@ -16,7 +16,13 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
 
 /* ── Sidebar ── */
 .sidebar{width:230px;min-width:230px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:16px 10px;gap:2px;overflow-y:auto}
-.sidebar-logo{font-size:15px;font-weight:700;color:var(--accent);padding:4px 10px 14px;letter-spacing:.5px}
+.sidebar-logo{font-size:15px;font-weight:700;color:var(--accent);padding:4px 10px 10px;letter-spacing:.5px}
+.search-wrap{position:relative;margin-bottom:6px}
+.search-wrap input{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:7px 10px 7px 30px;color:var(--text);font-size:13px;outline:none;transition:border-color .15s}
+.search-wrap input:focus{border-color:var(--accent)}
+.search-wrap .search-ic{position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:13px;pointer-events:none}
+.search-wrap .search-clear{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;line-height:1;display:none}
+.search-wrap .search-clear.visible{display:block}
 .nav-section{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);padding:10px 10px 4px}
 .nav-btn{background:none;border:none;color:var(--muted);cursor:pointer;padding:8px 10px;border-radius:8px;text-align:left;font-size:13px;display:flex;align-items:center;gap:8px;width:100%;transition:background .15s,color .15s}
 .nav-btn:hover{background:var(--surface2);color:var(--text)}
@@ -165,6 +171,15 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
 
 .empty{color:var(--muted);text-align:center;padding:40px;font-size:13px}
 .separator{border:none;border-top:1px solid var(--border)}
+
+/* ── Search results ── */
+.search-section-label{font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:6px;padding-left:2px}
+.search-hit{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;display:flex;align-items:center;gap:10px;margin-bottom:5px;cursor:pointer;transition:border-color .15s}
+.search-hit:hover{border-color:var(--accent)}
+.search-hit .hit-text{flex:1;font-size:13px}
+.search-hit .hit-text mark{background:transparent;color:var(--accent);font-weight:700}
+.search-hit .hit-proj{font-size:11px;padding:2px 7px;border-radius:10px;color:#fff;flex-shrink:0}
+.search-empty{color:var(--muted);text-align:center;padding:48px 0;font-size:13px}
 </style>
 </head>
 <body>
@@ -172,6 +187,12 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
 <!-- ── Sidebar ── -->
 <nav class="sidebar">
   <div class="sidebar-logo">⚡ Assistant</div>
+
+  <div class="search-wrap">
+    <span class="search-ic">🔍</span>
+    <input id="global-search" type="text" placeholder="Search tasks…" oninput="onSearch(this.value)" onkeydown="if(event.key==='Escape'){clearSearch()}"/>
+    <button class="search-clear" id="search-clear" onclick="clearSearch()">×</button>
+  </div>
 
   <div class="nav-section">Workspace</div>
   <button class="nav-btn active" onclick="switchView('list',this)" data-view="list"><span class="ic">✅</span> All Tasks</button>
@@ -271,6 +292,11 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
       <button class="chip" onclick="setPdFilter('done',this)">Done</button>
     </div>
     <div class="task-list" id="pd-task-list"></div>
+  </div>
+
+  <!-- Search Results -->
+  <div class="view" id="view-search">
+    <div id="search-results"></div>
   </div>
 
   <!-- Summary -->
@@ -694,6 +720,80 @@ function renderSummary(){
 
 // ── Close modals on overlay click ─────────────
 document.querySelectorAll('.modal-overlay').forEach(o=>o.addEventListener('click',e=>{ if(e.target===o) o.classList.remove('open') }));
+
+// ── Search ────────────────────────────────────
+let lastView = 'list';
+let searchTimeout = null;
+
+function onSearch(q) {
+  q = q.trim();
+  document.getElementById('search-clear').classList.toggle('visible', q.length > 0);
+  clearTimeout(searchTimeout);
+  if (!q) { clearSearch(); return; }
+  searchTimeout = setTimeout(() => runSearch(q), 150);
+}
+
+function runSearch(q) {
+  const lower = q.toLowerCase();
+  // remember where we came from (only if not already in search)
+  const active = document.querySelector('.view.active');
+  if (active && active.id !== 'view-search') lastView = active.id.replace('view-', '');
+
+  // show search view without touching nav highlight
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-search').classList.add('active');
+
+  const tasks = allTasks();
+  const taskHits = tasks.filter(t =>
+    t.text.toLowerCase().includes(lower) ||
+    (t.tags || []).some(tg => tg.toLowerCase().includes(lower))
+  );
+  const projHits = data.projects.filter(p =>
+    p.name.toLowerCase().includes(lower)
+  );
+
+  function highlight(str) {
+    const idx = str.toLowerCase().indexOf(lower);
+    if (idx === -1) return esc(str);
+    return esc(str.slice(0, idx)) + '<mark>' + esc(str.slice(idx, idx + q.length)) + '</mark>' + esc(str.slice(idx + q.length));
+  }
+
+  let html = '';
+
+  if (projHits.length) {
+    html += `<div class="search-section-label" style="margin-top:4px">Projects (${projHits.length})</div>`;
+    html += projHits.map(p => `
+      <div class="search-hit" onclick="openProject('${p.id}');clearSearch()">
+        <span class="proj-dot" style="background:${p.color};width:10px;height:10px"></span>
+        <span class="hit-text">${highlight(p.name)}</span>
+        <span style="font-size:11px;color:var(--muted)">${p.tasks.length} tasks</span>
+      </div>`).join('');
+  }
+
+  if (taskHits.length) {
+    html += `<div class="search-section-label" style="margin-top:${projHits.length ? 14 : 4}px">Tasks (${taskHits.length})</div>`;
+    html += taskHits.map(t => `
+      <div class="search-hit" onclick="openProject('${t._project.id}');clearSearch()">
+        <input class="task-cb" type="checkbox" ${t.status === 'done' ? 'checked' : ''} onclick="event.stopPropagation();toggleTask('${t.id}')" />
+        <span class="hit-text" style="${t.status==='done'?'text-decoration:line-through;opacity:.5':''}">${highlight(t.text)}</span>
+        <span class="hit-proj" style="background:${t._project.color}">${esc(t._project.name)}</span>
+        ${t.dueDate ? `<span class="due-tag ${isOverdue(t)?'overdue':isToday(t)?'today':''}">${fmtDate(t.dueDate)}</span>` : ''}
+      </div>`).join('');
+  }
+
+  if (!taskHits.length && !projHits.length) {
+    html = `<div class="search-empty">No results for "<strong>${esc(q)}</strong>"</div>`;
+  }
+
+  document.getElementById('search-results').innerHTML = html;
+}
+
+function clearSearch() {
+  document.getElementById('global-search').value = '';
+  document.getElementById('search-clear').classList.remove('visible');
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-' + lastView).classList.add('active');
+}
 
 // ── Boot ──────────────────────────────────────
 load();
