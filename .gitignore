@@ -1,5 +1,7 @@
 TaskManager/bin/
 TaskManager/obj/
 TaskManager/tasks.md
+TaskManager/tasks.json
+TaskManager/backups/
 *.user
 .vs/

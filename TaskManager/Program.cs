@@ -10,7 +10,22 @@ app.UseDefaultFiles();
 app.UseStaticFiles();
 
 var dataFile = Path.Combine(Directory.GetCurrentDirectory(), "tasks.json");
+var backupDir = Path.Combine(Directory.GetCurrentDirectory(), "backups");
 var jsonOpts = new JsonSerializerOptions { WriteIndented = true };
+const int MaxBackups = 20;
+
+void Backup()
+{
+    if (!File.Exists(dataFile)) return;
+    Directory.CreateDirectory(backupDir);
+    var stamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+    File.Copy(dataFile, Path.Combine(backupDir, $"tasks_{stamp}.json"), overwrite: true);
+    // prune oldest backups beyond MaxBackups
+    var files = Directory.GetFiles(backupDir, "tasks_*.json")
+                         .OrderByDescending(f => f).ToArray();
+    foreach (var old in files.Skip(MaxBackups))
+        File.Delete(old);
+}
 
 JsonObject LoadData()
 {
@@ -45,7 +60,7 @@ JsonObject LoadData()
     return JsonNode.Parse(File.ReadAllText(dataFile))!.AsObject();
 }
 
-void SaveData(JsonObject data) => File.WriteAllText(dataFile, data.ToJsonString(jsonOpts));
+void SaveData(JsonObject data) { Backup(); File.WriteAllText(dataFile, data.ToJsonString(jsonOpts)); }
 
 // GET /api/data
 app.MapGet("/api/data", () => Results.Text(File.Exists(dataFile)
@@ -59,6 +74,7 @@ app.MapPost("/api/data", async (HttpRequest req) =>
     var body = await reader.ReadToEndAsync();
     // validate JSON
     try { JsonNode.Parse(body); } catch { return Results.BadRequest("Invalid JSON"); }
+    Backup();
     File.WriteAllText(dataFile, body);
     return Results.Ok();
 });
@@ -162,7 +178,33 @@ app.MapGet("/api/schedule", () =>
     return Results.Json(items);
 });
 
-// Ensure data exists on startup
+// GET /api/backups — list available backups
+app.MapGet("/api/backups", () =>
+{
+    if (!Directory.Exists(backupDir)) return Results.Json(Array.Empty<object>());
+    var files = Directory.GetFiles(backupDir, "tasks_*.json")
+                         .OrderByDescending(f => f)
+                         .Select(f => new {
+                             name = Path.GetFileName(f),
+                             size = new FileInfo(f).Length,
+                             created = new FileInfo(f).CreationTime.ToString("yyyy-MM-dd HH:mm:ss")
+                         });
+    return Results.Json(files);
+});
+
+// POST /api/backups/restore/{name} — restore a backup
+app.MapPost("/api/backups/restore/{name}", (string name) =>
+{
+    var src = Path.Combine(backupDir, name);
+    if (!File.Exists(src) || !name.StartsWith("tasks_") || !name.EndsWith(".json"))
+        return Results.BadRequest("Invalid backup name");
+    Backup(); // backup current before restoring
+    File.Copy(src, dataFile, overwrite: true);
+    return Results.Ok();
+});
+
+// Backup on startup, then ensure data file exists
+Backup();
 LoadData();
 
 app.Run("http://localhost:5199");
