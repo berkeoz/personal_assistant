@@ -1,494 +1,702 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Task Manager</title>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Personal Assistant</title>
 <style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0f1117;--surface:#1a1d27;--surface2:#22263a;--surface3:#2a2f47;
+  --border:#2e3250;--accent:#6c8eff;--accent2:#a78bfa;
+  --green:#34d399;--red:#f87171;--yellow:#fbbf24;--orange:#fb923c;
+  --text:#e2e8f0;--muted:#94a3b8;--radius:10px;
+}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;font-size:14px;display:flex;height:100vh;overflow:hidden}
 
-  :root {
-    --bg: #0f1117;
-    --surface: #1a1d27;
-    --surface2: #22263a;
-    --border: #2e3250;
-    --accent: #6c8eff;
-    --accent2: #a78bfa;
-    --green: #34d399;
-    --red: #f87171;
-    --text: #e2e8f0;
-    --muted: #94a3b8;
-    --radius: 10px;
-  }
+/* ── Sidebar ── */
+.sidebar{width:230px;min-width:230px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:16px 10px;gap:2px;overflow-y:auto}
+.sidebar-logo{font-size:15px;font-weight:700;color:var(--accent);padding:4px 10px 14px;letter-spacing:.5px}
+.nav-section{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);padding:10px 10px 4px}
+.nav-btn{background:none;border:none;color:var(--muted);cursor:pointer;padding:8px 10px;border-radius:8px;text-align:left;font-size:13px;display:flex;align-items:center;gap:8px;width:100%;transition:background .15s,color .15s}
+.nav-btn:hover{background:var(--surface2);color:var(--text)}
+.nav-btn.active{background:var(--surface2);color:var(--accent);font-weight:600}
+.nav-btn .ic{font-size:15px;width:18px;text-align:center}
+.nav-btn .badge{margin-left:auto;background:var(--surface3);color:var(--muted);font-size:11px;padding:1px 6px;border-radius:10px}
+.proj-btn{padding-left:18px;font-size:12px}
+.proj-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.sidebar-footer{margin-top:auto;padding-top:12px;border-top:1px solid var(--border)}
+.stats-mini{padding:10px;background:var(--surface2);border-radius:var(--radius);margin-top:8px}
+.stat-row{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:4px}
+.stat-row span{color:var(--text);font-weight:600}
+.prog-bar{height:3px;background:var(--border);border-radius:3px;overflow:hidden;margin-top:4px}
+.prog-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:3px;transition:width .4s}
 
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: 'Segoe UI', system-ui, sans-serif;
-    font-size: 14px;
-    display: flex;
-    height: 100vh;
-    overflow: hidden;
-  }
+/* ── Main area ── */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.topbar{padding:14px 22px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;background:var(--surface);flex-shrink:0}
+.topbar h2{font-size:16px;font-weight:600;flex:1}
+.btn{border:none;cursor:pointer;padding:7px 14px;border-radius:7px;font-size:13px;font-weight:500;transition:opacity .15s,transform .1s;white-space:nowrap}
+.btn:hover{opacity:.85}.btn:active{transform:scale(.97)}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-success{background:var(--green);color:#0f1117}
+.btn-danger{background:var(--red);color:#fff}
+.btn-ghost{background:var(--surface2);color:var(--text);border:1px solid var(--border)}
+.btn-sm{padding:4px 10px;font-size:12px;border-radius:6px}
 
-  /* ── Sidebar ── */
-  .sidebar {
-    width: 220px;
-    min-width: 220px;
-    background: var(--surface);
-    border-right: 1px solid var(--border);
-    display: flex;
-    flex-direction: column;
-    padding: 20px 12px;
-    gap: 4px;
-  }
-  .sidebar h1 {
-    font-size: 15px;
-    font-weight: 700;
-    color: var(--accent);
-    margin-bottom: 16px;
-    padding-left: 8px;
-    letter-spacing: 0.5px;
-  }
-  .nav-btn {
-    background: none;
-    border: none;
-    color: var(--muted);
-    cursor: pointer;
-    padding: 9px 12px;
-    border-radius: var(--radius);
-    text-align: left;
-    font-size: 13px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    transition: background 0.15s, color 0.15s;
-  }
-  .nav-btn:hover { background: var(--surface2); color: var(--text); }
-  .nav-btn.active { background: var(--surface2); color: var(--accent); font-weight: 600; }
-  .nav-btn .icon { font-size: 16px; width: 20px; text-align: center; }
+.view{flex:1;overflow:auto;padding:22px;display:none;flex-direction:column;gap:16px}
+.view.active{display:flex}
 
-  /* ── Stats strip in sidebar ── */
-  .stats-strip {
-    margin-top: auto;
-    background: var(--surface2);
-    border-radius: var(--radius);
-    padding: 12px;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-  .stat { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); }
-  .stat span { color: var(--text); font-weight: 600; }
-  .progress-bar { height: 4px; background: var(--border); border-radius: 4px; overflow: hidden; }
-  .progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent2)); border-radius: 4px; transition: width 0.4s ease; }
+/* ── Task list ── */
+.add-row{display:flex;gap:8px;flex-wrap:wrap}
+.add-row input,.add-row select{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-size:13px;outline:none;transition:border-color .15s}
+.add-row input:focus,.add-row select:focus{border-color:var(--accent)}
+.add-row input{flex:1;min-width:180px}
+.add-row select{background:var(--surface)}
+.filter-row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.chip{padding:4px 12px;border-radius:20px;border:1px solid var(--border);background:none;color:var(--muted);cursor:pointer;font-size:12px;transition:all .15s}
+.chip.active{background:var(--accent);border-color:var(--accent);color:#fff}
+.task-list{display:flex;flex-direction:column;gap:5px}
+.task-item{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;display:flex;align-items:center;gap:10px;transition:border-color .15s}
+.task-item:hover{border-color:var(--accent)}
+.task-item.done{opacity:.5}
+.task-item.done .task-text{text-decoration:line-through}
+.task-item.overdue{border-color:var(--red)!important}
+.task-cb{width:16px;height:16px;cursor:pointer;accent-color:var(--accent);flex-shrink:0}
+.task-text{flex:1;font-size:13px}
+.task-meta{display:flex;gap:6px;align-items:center;flex-shrink:0;flex-wrap:wrap}
+.tag{font-size:11px;padding:2px 7px;border-radius:10px;background:var(--surface2);color:var(--accent2)}
+.proj-tag{font-size:11px;padding:2px 7px;border-radius:10px;color:#fff}
+.due-tag{font-size:11px;padding:2px 7px;border-radius:10px;background:var(--surface2);color:var(--muted)}
+.due-tag.overdue{background:#3d1515;color:var(--red)}
+.due-tag.today{background:#1d2d1a;color:var(--green)}
+.status-badge{font-size:10px;padding:2px 7px;border-radius:10px;text-transform:uppercase;letter-spacing:.5px}
+.status-todo{background:var(--surface3);color:var(--muted)}
+.status-inprogress{background:#1a2a3d;color:var(--accent)}
+.status-done{background:#1a3028;color:var(--green)}
+.task-del{background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;line-height:1;padding:0 2px;transition:color .15s;flex-shrink:0}
+.task-del:hover{color:var(--red)}
 
-  /* ── Main ── */
-  .main {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
+/* ── Kanban ── */
+.kanban-board{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;align-items:start}
+.kanban-col{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.kanban-header{padding:12px 14px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border)}
+.kanban-header .count{margin-left:auto;font-size:11px;color:var(--muted);background:var(--surface2);padding:2px 8px;border-radius:10px}
+.kanban-cards{padding:10px;display:flex;flex-direction:column;gap:8px;min-height:60px}
+.kanban-card{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;cursor:grab;transition:border-color .15s,box-shadow .15s;user-select:none}
+.kanban-card:hover{border-color:var(--accent);box-shadow:0 2px 12px #0006}
+.kanban-card.dragging{opacity:.4;cursor:grabbing}
+.kanban-card .kc-text{font-size:13px;margin-bottom:6px}
+.kanban-card .kc-meta{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.kanban-drop-zone{border:2px dashed var(--accent);border-radius:8px;height:50px;display:none;align-items:center;justify-content:center;color:var(--accent);font-size:12px}
+.kanban-drop-zone.active{display:flex}
+.kanban-add{padding:8px 10px;border-top:1px solid var(--border)}
+.kanban-add input{width:100%;background:var(--surface3);border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--text);font-size:12px;outline:none}
+.kanban-add input:focus{border-color:var(--accent)}
 
-  .topbar {
-    padding: 16px 24px;
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    background: var(--surface);
-  }
-  .topbar h2 { font-size: 16px; font-weight: 600; flex: 1; }
-  .btn {
-    border: none;
-    cursor: pointer;
-    padding: 7px 14px;
-    border-radius: 7px;
-    font-size: 13px;
-    font-weight: 500;
-    transition: opacity 0.15s;
-  }
-  .btn:hover { opacity: 0.85; }
-  .btn-primary { background: var(--accent); color: #fff; }
-  .btn-success { background: var(--green); color: #0f1117; }
-  .btn-ghost { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+/* ── Schedule ── */
+.schedule-add-row{display:flex;gap:8px;flex-wrap:wrap}
+.schedule-add-row input,.schedule-add-row select{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-size:13px;outline:none;transition:border-color .15s}
+.schedule-add-row input:focus{border-color:var(--accent)}
+.schedule-section{margin-top:4px}
+.schedule-label{font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:8px;padding-left:2px}
+.schedule-item{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;display:flex;align-items:center;gap:12px;margin-bottom:6px;transition:border-color .15s}
+.schedule-item:hover{border-color:var(--accent)}
+.schedule-item.overdue{border-left:3px solid var(--red)}
+.schedule-item.today{border-left:3px solid var(--green)}
+.schedule-item.upcoming{border-left:3px solid var(--accent)}
+.schedule-item.done{opacity:.5}
+.schedule-item.done .si-text{text-decoration:line-through}
+.si-date{min-width:90px;font-size:12px;color:var(--muted);text-align:right}
+.si-date.overdue{color:var(--red)}
+.si-date.today{color:var(--green)}
+.si-text{flex:1;font-size:13px}
+.si-proj{font-size:11px;padding:2px 7px;border-radius:10px;color:#fff;flex-shrink:0}
 
-  .view { flex: 1; overflow: auto; padding: 24px; display: none; }
-  .view.active { display: flex; flex-direction: column; gap: 16px; }
+/* ── Projects ── */
+.projects-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
+.proj-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;cursor:pointer;transition:border-color .15s,box-shadow .15s}
+.proj-card:hover{border-color:var(--accent);box-shadow:0 2px 16px #0005}
+.proj-card-header{padding:14px 16px;display:flex;align-items:center;gap:10px}
+.proj-card-title{font-weight:600;font-size:14px;flex:1}
+.proj-card-body{padding:0 16px 14px;font-size:12px;color:var(--muted)}
+.proj-card-bar{height:3px;background:var(--border)}
+.proj-card-fill{height:100%;border-radius:3px;transition:width .4s}
+.proj-card-stats{display:flex;gap:16px;margin-top:8px;font-size:12px}
+.proj-stat{color:var(--muted)}.proj-stat strong{color:var(--text)}
+.new-proj-card{background:none;border:2px dashed var(--border);border-radius:var(--radius);padding:30px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;cursor:pointer;transition:border-color .15s,color .15s;color:var(--muted);font-size:13px}
+.new-proj-card:hover{border-color:var(--accent);color:var(--accent)}
 
-  /* ── Task list view ── */
-  .add-row { display: flex; gap: 8px; }
-  .add-row input {
-    flex: 1;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 9px 14px;
-    color: var(--text);
-    font-size: 13px;
-    outline: none;
-    transition: border-color 0.15s;
-  }
-  .add-row input:focus { border-color: var(--accent); }
+/* ── Project detail ── */
+.back-btn{background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;display:flex;align-items:center;gap:6px;padding:0;margin-bottom:4px}
+.back-btn:hover{color:var(--text)}
 
-  .filter-row { display: flex; gap: 6px; flex-wrap: wrap; }
-  .filter-chip {
-    padding: 4px 12px;
-    border-radius: 20px;
-    border: 1px solid var(--border);
-    background: none;
-    color: var(--muted);
-    cursor: pointer;
-    font-size: 12px;
-    transition: all 0.15s;
-  }
-  .filter-chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+/* ── Summary ── */
+.summary-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.sum-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px}
+.sum-card .lbl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px}
+.sum-card .val{font-size:26px;font-weight:700}
+.sum-card.blue .val{color:var(--accent)}.sum-card.green .val{color:var(--green)}
+.sum-card.purple .val{color:var(--accent2)}.sum-card.orange .val{color:var(--orange)}
+.sum-proj-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
+.sum-proj{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px}
+.sum-proj h4{font-size:13px;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.sum-proj-bar{height:4px;background:var(--border);border-radius:4px;overflow:hidden;margin-bottom:6px}
+.sum-proj-fill{height:100%;border-radius:4px}
 
-  .task-list { display: flex; flex-direction: column; gap: 6px; }
+/* ── Modal ── */
+.modal-overlay{position:fixed;inset:0;background:#0009;display:none;align-items:center;justify-content:center;z-index:100}
+.modal-overlay.open{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:24px;width:420px;max-width:95vw;display:flex;flex-direction:column;gap:14px}
+.modal h3{font-size:15px;font-weight:600}
+.field{display:flex;flex-direction:column;gap:5px}
+.field label{font-size:12px;color:var(--muted)}
+.field input,.field select,.field textarea{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--text);font-size:13px;outline:none;transition:border-color .15s}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--accent)}
+.field textarea{resize:vertical;min-height:70px}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:4px}
+.color-row{display:flex;gap:8px;flex-wrap:wrap}
+.color-swatch{width:24px;height:24px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:border-color .15s}
+.color-swatch.selected{border-color:#fff}
 
-  .task-item {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 11px 14px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    transition: border-color 0.15s;
-  }
-  .task-item:hover { border-color: var(--accent); }
-  .task-item.done { opacity: 0.5; }
-  .task-item.done .task-text { text-decoration: line-through; }
+/* ── Toast ── */
+#toast{position:fixed;bottom:20px;right:20px;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:10px 18px;border-radius:8px;font-size:13px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:999}
+#toast.show{opacity:1}
 
-  .task-cb { width: 17px; height: 17px; cursor: pointer; accent-color: var(--accent); flex-shrink: 0; }
-  .task-text { flex: 1; font-size: 13px; }
-  .task-tag {
-    font-size: 11px;
-    padding: 2px 8px;
-    border-radius: 12px;
-    background: var(--surface2);
-    color: var(--accent2);
-  }
-  .task-del {
-    background: none;
-    border: none;
-    color: var(--muted);
-    cursor: pointer;
-    font-size: 16px;
-    line-height: 1;
-    padding: 0 2px;
-    transition: color 0.15s;
-  }
-  .task-del:hover { color: var(--red); }
-
-  /* ── Editor view ── */
-  .editor-wrap { flex: 1; display: flex; flex-direction: column; gap: 10px; }
-  #md-editor {
-    flex: 1;
-    min-height: 400px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 16px;
-    color: var(--text);
-    font-family: 'Cascadia Code', 'Consolas', monospace;
-    font-size: 13px;
-    line-height: 1.7;
-    resize: none;
-    outline: none;
-    transition: border-color 0.15s;
-  }
-  #md-editor:focus { border-color: var(--accent); }
-  .editor-actions { display: flex; gap: 8px; justify-content: flex-end; }
-  .save-status { font-size: 12px; color: var(--muted); align-self: center; margin-right: auto; }
-  .save-status.saved { color: var(--green); }
-
-  /* ── Summary view ── */
-  .summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
-  .summary-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 16px 20px;
-  }
-  .summary-card .label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 6px; }
-  .summary-card .value { font-size: 28px; font-weight: 700; }
-  .summary-card.green .value { color: var(--green); }
-  .summary-card.blue .value { color: var(--accent); }
-  .summary-card.purple .value { color: var(--accent2); }
-
-  .pending-list { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
-  .pending-list h3 { font-size: 13px; color: var(--muted); margin-bottom: 12px; }
-  .pending-item { padding: 7px 0; border-bottom: 1px solid var(--border); font-size: 13px; display: flex; align-items: center; gap: 8px; }
-  .pending-item:last-child { border-bottom: none; }
-  .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
-
-  .empty { color: var(--muted); text-align: center; padding: 40px; }
-
-  /* toast */
-  #toast {
-    position: fixed; bottom: 20px; right: 20px;
-    background: var(--surface2); border: 1px solid var(--border);
-    color: var(--text); padding: 10px 18px; border-radius: 8px;
-    font-size: 13px; opacity: 0; transition: opacity 0.25s;
-    pointer-events: none; z-index: 999;
-  }
-  #toast.show { opacity: 1; }
+.empty{color:var(--muted);text-align:center;padding:40px;font-size:13px}
+.separator{border:none;border-top:1px solid var(--border)}
 </style>
 </head>
 <body>
 
+<!-- ── Sidebar ── -->
 <nav class="sidebar">
-  <h1>⚡ Tasks</h1>
-  <button class="nav-btn active" data-view="list" onclick="switchView('list', this)">
-    <span class="icon">✅</span> Task List
-  </button>
-  <button class="nav-btn" data-view="editor" onclick="switchView('editor', this)">
-    <span class="icon">📝</span> Markdown Editor
-  </button>
-  <button class="nav-btn" data-view="summary" onclick="switchView('summary', this)">
-    <span class="icon">📊</span> Summary
-  </button>
+  <div class="sidebar-logo">⚡ Assistant</div>
 
-  <div class="stats-strip" id="sidebar-stats">
-    <div class="stat">Total <span id="s-total">–</span></div>
-    <div class="stat">Done <span id="s-done">–</span></div>
-    <div class="progress-bar"><div class="progress-fill" id="s-bar" style="width:0%"></div></div>
+  <div class="nav-section">Workspace</div>
+  <button class="nav-btn active" onclick="switchView('list',this)" data-view="list"><span class="ic">✅</span> All Tasks</button>
+  <button class="nav-btn" onclick="switchView('kanban',this)" data-view="kanban"><span class="ic">📋</span> Kanban</button>
+  <button class="nav-btn" onclick="switchView('schedule',this)" data-view="schedule"><span class="ic">📅</span> Schedule</button>
+  <button class="nav-btn" onclick="switchView('summary',this)" data-view="summary"><span class="ic">📊</span> Summary</button>
+
+  <div class="nav-section">Projects</div>
+  <div id="proj-nav"></div>
+  <button class="nav-btn" onclick="openNewProjectModal()" style="color:var(--accent)"><span class="ic">＋</span> New Project</button>
+
+  <div class="sidebar-footer">
+    <div class="stats-mini">
+      <div class="stat-row">Total <span id="s-total">–</span></div>
+      <div class="stat-row">Done <span id="s-done">–</span></div>
+      <div class="prog-bar"><div class="prog-fill" id="s-bar" style="width:0%"></div></div>
+    </div>
   </div>
 </nav>
 
+<!-- ── Main ── -->
 <div class="main">
 
-  <!-- Task List -->
+  <!-- All Tasks -->
   <div class="view active" id="view-list">
     <div class="add-row">
-      <input id="new-task-input" type="text" placeholder="Add a task… (Enter to add)" />
-      <button class="btn btn-primary" onclick="addTask()">+ Add</button>
+      <input id="li-text" type="text" placeholder="New task… (Enter)"/>
+      <select id="li-proj"></select>
+      <input id="li-due" type="date"/>
+      <button class="btn btn-primary" onclick="addTaskFromList()">+ Add</button>
     </div>
     <div class="filter-row">
-      <button class="filter-chip active" onclick="setFilter('all', this)">All</button>
-      <button class="filter-chip" onclick="setFilter('pending', this)">Pending</button>
-      <button class="filter-chip" onclick="setFilter('done', this)">Done</button>
+      <button class="chip active" onclick="setListFilter('all',this)">All</button>
+      <button class="chip" onclick="setListFilter('todo',this)">Todo</button>
+      <button class="chip" onclick="setListFilter('inprogress',this)">In Progress</button>
+      <button class="chip" onclick="setListFilter('done',this)">Done</button>
+      <button class="chip" onclick="setListFilter('overdue',this)">Overdue</button>
     </div>
     <div class="task-list" id="task-list"></div>
   </div>
 
-  <!-- Editor -->
-  <div class="view" id="view-editor">
-    <div class="editor-wrap">
-      <textarea id="md-editor" spellcheck="false" placeholder="Loading…"></textarea>
-      <div class="editor-actions">
-        <span class="save-status" id="save-status">unsaved changes</span>
-        <button class="btn btn-ghost" onclick="loadMarkdown()">↺ Reload</button>
-        <button class="btn btn-success" onclick="saveMarkdown()">💾 Save</button>
+  <!-- Kanban -->
+  <div class="view" id="view-kanban">
+    <div class="filter-row" id="kb-proj-filter" style="margin-bottom:4px"></div>
+    <div class="kanban-board">
+      <div class="kanban-col" id="col-todo">
+        <div class="kanban-header" style="border-top:3px solid var(--muted)"><span>⬜ Todo</span><span class="count" id="kb-cnt-todo">0</span></div>
+        <div class="kanban-cards" id="kc-todo" ondragover="kbDragOver(event,'todo')" ondrop="kbDrop(event,'todo')" ondragleave="kbDragLeave(event)"></div>
+        <div class="kanban-add"><input placeholder="+ Quick add…" onkeydown="kbQuickAdd(event,'todo')"/></div>
+      </div>
+      <div class="kanban-col" id="col-inprogress">
+        <div class="kanban-header" style="border-top:3px solid var(--accent)"><span>🔵 In Progress</span><span class="count" id="kb-cnt-inprogress">0</span></div>
+        <div class="kanban-cards" id="kc-inprogress" ondragover="kbDragOver(event,'inprogress')" ondrop="kbDrop(event,'inprogress')" ondragleave="kbDragLeave(event)"></div>
+        <div class="kanban-add"><input placeholder="+ Quick add…" onkeydown="kbQuickAdd(event,'inprogress')"/></div>
+      </div>
+      <div class="kanban-col" id="col-done">
+        <div class="kanban-header" style="border-top:3px solid var(--green)"><span>✅ Done</span><span class="count" id="kb-cnt-done">0</span></div>
+        <div class="kanban-cards" id="kc-done" ondragover="kbDragOver(event,'done')" ondrop="kbDrop(event,'done')" ondragleave="kbDragLeave(event)"></div>
+        <div class="kanban-add"><input placeholder="+ Quick add…" onkeydown="kbQuickAdd(event,'done')"/></div>
       </div>
     </div>
+  </div>
+
+  <!-- Schedule -->
+  <div class="view" id="view-schedule">
+    <div class="schedule-add-row">
+      <input id="sc-text" type="text" placeholder="Scheduled task…" style="flex:1;min-width:160px"/>
+      <select id="sc-proj"></select>
+      <input id="sc-due" type="datetime-local"/>
+      <button class="btn btn-primary" onclick="addScheduledTask()">+ Add</button>
+    </div>
+    <div id="schedule-list"></div>
+  </div>
+
+  <!-- Projects -->
+  <div class="view" id="view-projects">
+    <div class="projects-grid" id="projects-grid"></div>
+  </div>
+
+  <!-- Project Detail -->
+  <div class="view" id="view-project-detail">
+    <button class="back-btn" onclick="switchView('projects',null)">← Back to Projects</button>
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <span id="pd-dot" class="proj-dot" style="width:12px;height:12px"></span>
+      <h2 id="pd-title" style="font-size:18px"></h2>
+      <button class="btn btn-danger btn-sm" id="pd-delete" onclick="deleteCurrentProject()">Delete Project</button>
+    </div>
+    <div class="add-row">
+      <input id="pd-text" type="text" placeholder="New task… (Enter)"/>
+      <input id="pd-due" type="date"/>
+      <button class="btn btn-primary" onclick="addTaskToCurrentProject()">+ Add</button>
+    </div>
+    <div class="filter-row">
+      <button class="chip active" onclick="setPdFilter('all',this)">All</button>
+      <button class="chip" onclick="setPdFilter('todo',this)">Todo</button>
+      <button class="chip" onclick="setPdFilter('inprogress',this)">In Progress</button>
+      <button class="chip" onclick="setPdFilter('done',this)">Done</button>
+    </div>
+    <div class="task-list" id="pd-task-list"></div>
   </div>
 
   <!-- Summary -->
   <div class="view" id="view-summary">
     <div class="summary-grid">
-      <div class="summary-card blue"><div class="label">Total</div><div class="value" id="sum-total">–</div></div>
-      <div class="summary-card green"><div class="label">Completed</div><div class="value" id="sum-done">–</div></div>
-      <div class="summary-card purple"><div class="label">Pending</div><div class="value" id="sum-pending">–</div></div>
+      <div class="sum-card blue"><div class="lbl">Total Tasks</div><div class="val" id="sm-total">–</div></div>
+      <div class="sum-card green"><div class="lbl">Completed</div><div class="val" id="sm-done">–</div></div>
+      <div class="sum-card purple"><div class="lbl">In Progress</div><div class="val" id="sm-inprog">–</div></div>
+      <div class="sum-card orange"><div class="lbl">Overdue</div><div class="val" id="sm-overdue">–</div></div>
     </div>
-    <div class="pending-list">
-      <h3>Pending tasks</h3>
-      <div id="sum-list"></div>
-    </div>
+    <div class="sum-proj-list" id="sm-proj-list"></div>
   </div>
 
+</div>
+
+<!-- ── New Project Modal ── -->
+<div class="modal-overlay" id="modal-proj">
+  <div class="modal">
+    <h3>New Project</h3>
+    <div class="field"><label>Project Name</label><input id="mp-name" placeholder="e.g. Work, Personal…"/></div>
+    <div class="field">
+      <label>Color</label>
+      <div class="color-row" id="color-row"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modal-proj')">Cancel</button>
+      <button class="btn btn-primary" onclick="createProject()">Create</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Edit Task Modal ── -->
+<div class="modal-overlay" id="modal-task">
+  <div class="modal">
+    <h3>Edit Task</h3>
+    <div class="field"><label>Task</label><input id="mt-text"/></div>
+    <div class="field"><label>Status</label>
+      <select id="mt-status">
+        <option value="todo">Todo</option>
+        <option value="inprogress">In Progress</option>
+        <option value="done">Done</option>
+      </select>
+    </div>
+    <div class="field"><label>Due Date</label><input id="mt-due" type="date"/></div>
+    <div class="field"><label>Tags (comma separated)</label><input id="mt-tags" placeholder="work, urgent…"/></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modal-task')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveEditTask()">Save</button>
+    </div>
+  </div>
 </div>
 
 <div id="toast"></div>
 
 <script>
 const API = 'http://localhost:5199/api';
-let rawMd = '';
-let filter = 'all';
-let dirty = false;
+const COLORS = ['#6c8eff','#a78bfa','#34d399','#fbbf24','#f87171','#fb923c','#38bdf8','#f472b6'];
+let data = { projects: [] };
+let listFilter = 'all';
+let kbProjectFilter = null;
+let currentProjectId = null;
+let pdFilter = 'all';
+let editingTaskId = null;
+let dragTaskId = null;
 
-// ── Utils ──────────────────────────────────────────────
-function toast(msg, dur = 2000) {
-  const el = document.getElementById('toast');
-  el.textContent = msg;
-  el.classList.add('show');
-  setTimeout(() => el.classList.remove('show'), dur);
+// ── Utils ─────────────────────────────────────
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') }
+function toast(msg,dur=2200){ const e=document.getElementById('toast'); e.textContent=msg; e.classList.add('show'); setTimeout(()=>e.classList.remove('show'),dur) }
+function openModal(id){ document.getElementById(id).classList.add('open') }
+function closeModal(id){ document.getElementById(id).classList.remove('open') }
+
+function allTasks(){ return data.projects.flatMap(p=>p.tasks.map(t=>({...t,_project:p}))) }
+function findTask(id){ for(const p of data.projects){ const t=p.tasks.find(t=>t.id===id); if(t) return {task:t,project:p} } return null }
+function findProject(id){ return data.projects.find(p=>p.id===id) }
+
+function isOverdue(t){ return t.dueDate && t.status!=='done' && new Date(t.dueDate)<new Date() }
+function isToday(t){
+  if(!t.dueDate) return false;
+  const d=new Date(t.dueDate), now=new Date();
+  return d.toDateString()===now.toDateString();
+}
+function fmtDate(d){
+  if(!d) return '';
+  const dt=new Date(d);
+  return dt.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+}
+function fmtDatetime(d){
+  if(!d) return '';
+  const dt=new Date(d);
+  return dt.toLocaleDateString('en-US',{month:'short',day:'numeric'})+' '+dt.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
 }
 
-function switchView(name, btn) {
-  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-  document.getElementById('view-' + name).classList.add('active');
-  btn.classList.add('active');
-  if (name === 'list') renderList();
-  if (name === 'editor') loadMarkdown();
-  if (name === 'summary') loadSummary();
+// ── Data ──────────────────────────────────────
+async function load(){
+  const r=await fetch(`${API}/data`);
+  data=await r.json();
+  renderAll();
+}
+async function patch(id,fields){
+  await fetch(`${API}/tasks/${id}`,{method:'PATCH',body:JSON.stringify(fields),headers:{'Content-Type':'application/json'}});
+  await load();
+}
+async function deleteTask(id){
+  await fetch(`${API}/tasks/${id}`,{method:'DELETE'});
+  await load();
 }
 
-// ── Markdown helpers ───────────────────────────────────
-function parseTasks(md) {
-  return md.split('\n').map((line, i) => {
-    const t = line.trim();
-    if (!t.startsWith('- [')) return null;
-    const done = t[3] !== ' ';
-    const text = t.slice(5).trim();
-    // extract #tag
-    const tagMatch = text.match(/#(\w+)/);
-    const tag = tagMatch ? tagMatch[1] : null;
-    const cleanText = text.replace(/#\w+/g, '').trim();
-    return { lineIndex: i, done, text: cleanText, tag };
-  }).filter(Boolean);
+// ── View switching ─────────────────────────────
+function switchView(name,btn){
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('view-'+name).classList.add('active');
+  if(btn) btn.classList.add('active');
+  // highlight matching nav
+  document.querySelectorAll('[data-view="'+name+'"]').forEach(b=>b.classList.add('active'));
+  renderView(name);
 }
 
-function toggleInMd(lineIndex) {
-  const lines = rawMd.split('\n');
-  const line = lines[lineIndex];
-  if (line.includes('- [ ]')) lines[lineIndex] = line.replace('- [ ]', '- [x]');
-  else lines[lineIndex] = line.replace(/- \[[xX]\]/, '- [ ]');
-  rawMd = lines.join('\n');
-  return saveSilent();
+function renderAll(){
+  renderProjNav();
+  renderSidebarStats();
+  const active=document.querySelector('.view.active');
+  if(active) renderView(active.id.replace('view-',''));
 }
 
-function deleteInMd(lineIndex) {
-  const lines = rawMd.split('\n');
-  lines.splice(lineIndex, 1);
-  rawMd = lines.join('\n');
-  return saveSilent();
+function renderView(name){
+  if(name==='list') renderList();
+  else if(name==='kanban') renderKanban();
+  else if(name==='schedule') renderSchedule();
+  else if(name==='projects') renderProjects();
+  else if(name==='project-detail') renderProjectDetail();
+  else if(name==='summary') renderSummary();
 }
 
-function appendTask(text) {
-  if (!rawMd.endsWith('\n')) rawMd += '\n';
-  rawMd += `- [ ] ${text}\n`;
-  return saveSilent();
+// ── Sidebar ───────────────────────────────────
+function renderProjNav(){
+  const el=document.getElementById('proj-nav');
+  el.innerHTML=data.projects.map(p=>`
+    <button class="nav-btn proj-btn" onclick="openProject('${p.id}')">
+      <span class="proj-dot" style="background:${p.color}"></span>
+      ${esc(p.name)}
+      <span class="badge">${p.tasks.length}</span>
+    </button>`).join('');
+}
+function renderSidebarStats(){
+  const tasks=allTasks();
+  const done=tasks.filter(t=>t.status==='done').length;
+  document.getElementById('s-total').textContent=tasks.length;
+  document.getElementById('s-done').textContent=done;
+  const pct=tasks.length?Math.round(done/tasks.length*100):0;
+  document.getElementById('s-bar').style.width=pct+'%';
 }
 
-async function saveSilent() {
-  await fetch(`${API}/tasks`, { method: 'POST', body: rawMd, headers: { 'Content-Type': 'text/plain' } });
-  updateSidebarStats();
+// ── All Tasks view ─────────────────────────────
+function populateProjectSelects(){
+  [document.getElementById('li-proj'),document.getElementById('sc-proj')].forEach(sel=>{
+    if(!sel) return;
+    sel.innerHTML=data.projects.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('');
+  });
 }
-
-// ── Load / Render ──────────────────────────────────────
-async function loadRaw() {
-  const r = await fetch(`${API}/tasks`);
-  rawMd = await r.text();
-}
-
-function setFilter(f, btn) {
-  filter = f;
-  document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+function setListFilter(f,btn){
+  listFilter=f;
+  document.querySelectorAll('#view-list .chip').forEach(c=>c.classList.remove('active'));
   btn.classList.add('active');
   renderList();
 }
+function renderList(){
+  populateProjectSelects();
+  const now=new Date();
+  let tasks=allTasks();
+  if(listFilter==='todo') tasks=tasks.filter(t=>t.status==='todo');
+  else if(listFilter==='inprogress') tasks=tasks.filter(t=>t.status==='inprogress');
+  else if(listFilter==='done') tasks=tasks.filter(t=>t.status==='done');
+  else if(listFilter==='overdue') tasks=tasks.filter(t=>isOverdue(t));
+  const el=document.getElementById('task-list');
+  el.innerHTML=tasks.length?tasks.map(t=>taskItemHTML(t,true)).join(''):`<div class="empty">No tasks here.</div>`;
+}
+async function addTaskFromList(){
+  const text=document.getElementById('li-text').value.trim();
+  const projId=document.getElementById('li-proj').value;
+  const due=document.getElementById('li-due').value;
+  if(!text||!projId) return;
+  await fetch(`${API}/projects/${projId}/tasks`,{method:'POST',body:JSON.stringify({text,dueDate:due||null,status:'todo'}),headers:{'Content-Type':'application/json'}});
+  document.getElementById('li-text').value='';
+  document.getElementById('li-due').value='';
+  await load(); toast('Task added');
+}
+document.getElementById('li-text').addEventListener('keydown',e=>{ if(e.key==='Enter') addTaskFromList() });
 
-function renderList() {
-  const tasks = parseTasks(rawMd);
-  const filtered = tasks.filter(t => filter === 'all' || (filter === 'done' ? t.done : !t.done));
-  const el = document.getElementById('task-list');
-  if (filtered.length === 0) {
-    el.innerHTML = `<div class="empty">No tasks here yet.</div>`;
-    return;
-  }
-  el.innerHTML = filtered.map(t => `
-    <div class="task-item ${t.done ? 'done' : ''}">
-      <input class="task-cb" type="checkbox" ${t.done ? 'checked' : ''} onchange="toggle(${t.lineIndex})" />
-      <span class="task-text">${escHtml(t.text)}</span>
-      ${t.tag ? `<span class="task-tag">#${t.tag}</span>` : ''}
-      <button class="task-del" onclick="deleteTask(${t.lineIndex})" title="Delete">×</button>
+function taskItemHTML(t, showProj=false){
+  const over=isOverdue(t), tod=isToday(t);
+  const dueClass=over?'overdue':tod?'today':'';
+  const dueLabel=over?`⚠ ${fmtDate(t.dueDate)}`:tod?`Today`:t.dueDate?fmtDate(t.dueDate):'';
+  const tags=(t.tags||[]).map(tg=>`<span class="tag">#${esc(tg)}</span>`).join('');
+  const projTag=showProj&&t._project?`<span class="proj-tag" style="background:${t._project.color}">${esc(t._project.name)}</span>`:'';
+  const statusMap={todo:'status-todo',inprogress:'status-inprogress',done:'status-done'};
+  const statusLabel={todo:'Todo',inprogress:'In Progress',done:'Done'};
+  return `<div class="task-item ${t.status==='done'?'done':''} ${over?'overdue':''}">
+    <input class="task-cb" type="checkbox" ${t.status==='done'?'checked':''} onchange="toggleTask('${t.id}')"/>
+    <span class="task-text">${esc(t.text)}</span>
+    <div class="task-meta">
+      ${tags}${projTag}
+      <span class="status-badge ${statusMap[t.status]||'status-todo'}">${statusLabel[t.status]||t.status}</span>
+      ${dueLabel?`<span class="due-tag ${dueClass}">${dueLabel}</span>`:''}
+      <button class="btn btn-ghost btn-sm" onclick="openEditTask('${t.id}')">✏</button>
+      <button class="task-del" onclick="confirmDelete('${t.id}')">×</button>
     </div>
-  `).join('');
+  </div>`;
+}
+async function toggleTask(id){
+  const {task}=findTask(id)||{};
+  if(!task) return;
+  const newStatus=task.status==='done'?'todo':'done';
+  await patch(id,{status:newStatus});
+}
+async function confirmDelete(id){
+  if(confirm('Delete this task?')){ await deleteTask(id); toast('Deleted') }
 }
 
-async function toggle(lineIndex) {
-  await toggleInMd(lineIndex);
-  await loadRaw();
-  renderList();
+// ── Edit task modal ────────────────────────────
+function openEditTask(id){
+  const {task}=findTask(id)||{};
+  if(!task) return;
+  editingTaskId=id;
+  document.getElementById('mt-text').value=task.text||'';
+  document.getElementById('mt-status').value=task.status||'todo';
+  document.getElementById('mt-due').value=task.dueDate?task.dueDate.slice(0,10):'';
+  document.getElementById('mt-tags').value=(task.tags||[]).join(', ');
+  openModal('modal-task');
+}
+async function saveEditTask(){
+  const text=document.getElementById('mt-text').value.trim();
+  const status=document.getElementById('mt-status').value;
+  const due=document.getElementById('mt-due').value;
+  const tagsRaw=document.getElementById('mt-tags').value;
+  const tags=tagsRaw.split(',').map(s=>s.trim()).filter(Boolean);
+  if(!text) return;
+  await patch(editingTaskId,{text,status,dueDate:due||null,tags});
+  closeModal('modal-task'); toast('Saved');
 }
 
-async function deleteTask(lineIndex) {
-  await deleteInMd(lineIndex);
-  await loadRaw();
-  renderList();
+// ── Kanban ─────────────────────────────────────
+function renderKanban(){
+  // project filter chips
+  const kbf=document.getElementById('kb-proj-filter');
+  kbf.innerHTML=`<button class="chip ${!kbProjectFilter?'active':''}" onclick="setKbFilter(null,this)">All</button>`+
+    data.projects.map(p=>`<button class="chip ${kbProjectFilter===p.id?'active':''}" onclick="setKbFilter('${p.id}',this)">${esc(p.name)}</button>`).join('');
+  const tasks=allTasks().filter(t=>!kbProjectFilter||t._project.id===kbProjectFilter);
+  ['todo','inprogress','done'].forEach(st=>{
+    const cards=tasks.filter(t=>t.status===st);
+    document.getElementById('kb-cnt-'+st).textContent=cards.length;
+    document.getElementById('kc-'+st).innerHTML=cards.map(t=>`
+      <div class="kanban-card" draggable="true" id="kc-${t.id}"
+        ondragstart="kbDragStart(event,'${t.id}')" ondragend="kbDragEnd(event)">
+        <div class="kc-text">${esc(t.text)}</div>
+        <div class="kc-meta">
+          <span class="proj-tag" style="background:${t._project.color};font-size:10px;padding:1px 6px">${esc(t._project.name)}</span>
+          ${t.dueDate?`<span class="due-tag ${isOverdue(t)?'overdue':isToday(t)?'today':''}">${fmtDate(t.dueDate)}</span>`:''}
+          <button class="task-del" style="margin-left:auto" onclick="confirmDelete('${t.id}')">×</button>
+        </div>
+      </div>`).join('');
+  });
+}
+function setKbFilter(id,btn){
+  kbProjectFilter=id;
+  document.querySelectorAll('#kb-proj-filter .chip').forEach(c=>c.classList.remove('active'));
+  btn.classList.add('active');
+  renderKanban();
+}
+function kbDragStart(e,id){ dragTaskId=id; e.target.classList.add('dragging') }
+function kbDragEnd(e){ e.target.classList.remove('dragging'); document.querySelectorAll('.kanban-cards').forEach(c=>c.style.background='') }
+function kbDragOver(e,col){ e.preventDefault(); document.getElementById('kc-'+col).style.background='var(--surface3)' }
+function kbDragLeave(e){ e.currentTarget.style.background='' }
+async function kbDrop(e,col){ e.preventDefault(); e.currentTarget.style.background=''; if(!dragTaskId) return; await patch(dragTaskId,{status:col}); dragTaskId=null }
+async function kbQuickAdd(e,status){
+  if(e.key!=='Enter') return;
+  const text=e.target.value.trim(); if(!text) return;
+  const proj=data.projects[0]; if(!proj) return;
+  await fetch(`${API}/projects/${proj.id}/tasks`,{method:'POST',body:JSON.stringify({text,status}),headers:{'Content-Type':'application/json'}});
+  e.target.value=''; await load(); toast('Task added');
 }
 
-async function addTask() {
-  const input = document.getElementById('new-task-input');
-  const text = input.value.trim();
-  if (!text) return;
-  input.value = '';
-  await appendTask(text);
-  await loadRaw();
-  renderList();
-  toast('Task added');
+// ── Schedule ───────────────────────────────────
+async function addScheduledTask(){
+  const text=document.getElementById('sc-text').value.trim();
+  const projId=document.getElementById('sc-proj').value;
+  const due=document.getElementById('sc-due').value;
+  if(!text||!projId||!due) { toast('Fill in task, project and date'); return }
+  await fetch(`${API}/projects/${projId}/tasks`,{method:'POST',body:JSON.stringify({text,dueDate:due,status:'todo'}),headers:{'Content-Type':'application/json'}});
+  document.getElementById('sc-text').value=''; document.getElementById('sc-due').value='';
+  await load(); toast('Scheduled');
+}
+document.getElementById('sc-text').addEventListener('keydown',e=>{ if(e.key==='Enter') addScheduledTask() });
+
+function renderSchedule(){
+  populateProjectSelects();
+  const now=new Date();
+  const todayStr=now.toDateString();
+  const tasks=allTasks().filter(t=>t.dueDate).sort((a,b)=>new Date(a.dueDate)-new Date(b.dueDate));
+  const overdue=tasks.filter(t=>isOverdue(t));
+  const today=tasks.filter(t=>isToday(t)&&t.status!=='done');
+  const upcoming=tasks.filter(t=>!isOverdue(t)&&!isToday(t)&&t.status!=='done');
+  const done=tasks.filter(t=>t.status==='done');
+  const el=document.getElementById('schedule-list');
+  let html='';
+  if(overdue.length){ html+=`<div class="schedule-section"><div class="schedule-label" style="color:var(--red)">⚠ Overdue (${overdue.length})</div>${overdue.map(t=>schedItemHTML(t,'overdue')).join('')}</div>` }
+  if(today.length){ html+=`<div class="schedule-section"><div class="schedule-label" style="color:var(--green)">Today</div>${today.map(t=>schedItemHTML(t,'today')).join('')}</div>` }
+  if(upcoming.length){ html+=`<div class="schedule-section"><div class="schedule-label">Upcoming</div>${upcoming.map(t=>schedItemHTML(t,'upcoming')).join('')}</div>` }
+  if(done.length){ html+=`<div class="schedule-section"><div class="schedule-label">Completed</div>${done.map(t=>schedItemHTML(t,'done')).join('')}</div>` }
+  el.innerHTML=html||`<div class="empty">No scheduled tasks. Add a task with a due date above.</div>`;
+}
+function schedItemHTML(t,cls){
+  return `<div class="schedule-item ${cls} ${t.status==='done'?'done':''}">
+    <input class="task-cb" type="checkbox" ${t.status==='done'?'checked':''} onchange="toggleTask('${t.id}')"/>
+    <span class="si-text">${esc(t.text)}</span>
+    <span class="si-proj" style="background:${t._project.color}">${esc(t._project.name)}</span>
+    <span class="si-date ${cls}">${fmtDatetime(t.dueDate)}</span>
+    <button class="task-del" onclick="confirmDelete('${t.id}')">×</button>
+  </div>`;
 }
 
-document.getElementById('new-task-input').addEventListener('keydown', e => {
-  if (e.key === 'Enter') addTask();
-});
-
-function escHtml(s) {
-  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+// ── Projects ───────────────────────────────────
+function renderProjects(){
+  const el=document.getElementById('projects-grid');
+  el.innerHTML=data.projects.map(p=>{
+    const total=p.tasks.length;
+    const done=p.tasks.filter(t=>t.status==='done').length;
+    const pct=total?Math.round(done/total*100):0;
+    return `<div class="proj-card" onclick="openProject('${p.id}')">
+      <div class="proj-card-header">
+        <span class="proj-dot" style="background:${p.color}"></span>
+        <span class="proj-card-title">${esc(p.name)}</span>
+      </div>
+      <div class="proj-card-bar"><div class="proj-card-fill" style="width:${pct}%;background:${p.color}"></div></div>
+      <div class="proj-card-body">
+        <div class="proj-card-stats">
+          <span class="proj-stat"><strong>${total}</strong> tasks</span>
+          <span class="proj-stat"><strong>${done}</strong> done</span>
+          <span class="proj-stat"><strong>${pct}%</strong></span>
+        </div>
+      </div>
+    </div>`;
+  }).join('')+`<div class="new-proj-card" onclick="openNewProjectModal()"><span style="font-size:24px">＋</span>New Project</div>`;
 }
 
-// ── Editor ─────────────────────────────────────────────
-async function loadMarkdown() {
-  await loadRaw();
-  document.getElementById('md-editor').value = rawMd;
-  setSaveStatus(false);
+function openProject(id){
+  currentProjectId=id; pdFilter='all';
+  document.querySelectorAll('#view-project-detail .chip').forEach(c=>c.classList.remove('active'));
+  document.querySelector('#view-project-detail .chip').classList.add('active');
+  switchView('project-detail',null);
+}
+function renderProjectDetail(){
+  const p=findProject(currentProjectId); if(!p) return;
+  document.getElementById('pd-title').textContent=p.name;
+  document.getElementById('pd-dot').style.background=p.color;
+  let tasks=p.tasks;
+  if(pdFilter==='todo') tasks=tasks.filter(t=>t.status==='todo');
+  else if(pdFilter==='inprogress') tasks=tasks.filter(t=>t.status==='inprogress');
+  else if(pdFilter==='done') tasks=tasks.filter(t=>t.status==='done');
+  const el=document.getElementById('pd-task-list');
+  el.innerHTML=tasks.length?tasks.map(t=>taskItemHTML({...t,_project:p},false)).join(''):`<div class="empty">No tasks yet.</div>`;
+}
+function setPdFilter(f,btn){
+  pdFilter=f;
+  document.querySelectorAll('#view-project-detail .chip').forEach(c=>c.classList.remove('active'));
+  btn.classList.add('active');
+  renderProjectDetail();
+}
+async function addTaskToCurrentProject(){
+  const text=document.getElementById('pd-text').value.trim();
+  const due=document.getElementById('pd-due').value;
+  if(!text||!currentProjectId) return;
+  await fetch(`${API}/projects/${currentProjectId}/tasks`,{method:'POST',body:JSON.stringify({text,dueDate:due||null,status:'todo'}),headers:{'Content-Type':'application/json'}});
+  document.getElementById('pd-text').value=''; document.getElementById('pd-due').value='';
+  await load(); toast('Task added');
+}
+document.getElementById('pd-text').addEventListener('keydown',e=>{ if(e.key==='Enter') addTaskToCurrentProject() });
+async function deleteCurrentProject(){
+  if(!confirm('Delete this project and ALL its tasks?')) return;
+  await fetch(`${API}/projects/${currentProjectId}`,{method:'DELETE'});
+  await load(); switchView('projects',null); toast('Project deleted');
 }
 
-function setSaveStatus(isDirty) {
-  dirty = isDirty;
-  const el = document.getElementById('save-status');
-  if (isDirty) { el.textContent = 'unsaved changes'; el.classList.remove('saved'); }
-  else { el.textContent = 'saved'; el.classList.add('saved'); }
+// ── New project modal ──────────────────────────
+let selectedColor=COLORS[0];
+function openNewProjectModal(){
+  document.getElementById('mp-name').value='';
+  selectedColor=COLORS[0];
+  const row=document.getElementById('color-row');
+  row.innerHTML=COLORS.map(c=>`<div class="color-swatch ${c===selectedColor?'selected':''}" style="background:${c}" onclick="selectColor('${c}',this)"></div>`).join('');
+  openModal('modal-proj');
+}
+function selectColor(c,el){ selectedColor=c; document.querySelectorAll('.color-swatch').forEach(s=>s.classList.remove('selected')); el.classList.add('selected') }
+async function createProject(){
+  const name=document.getElementById('mp-name').value.trim(); if(!name) return;
+  await fetch(`${API}/projects`,{method:'POST',body:JSON.stringify({name,color:selectedColor}),headers:{'Content-Type':'application/json'}});
+  closeModal('modal-proj'); await load(); toast('Project created');
 }
 
-document.getElementById('md-editor').addEventListener('input', () => setSaveStatus(true));
-
-async function saveMarkdown() {
-  rawMd = document.getElementById('md-editor').value;
-  await fetch(`${API}/tasks`, { method: 'POST', body: rawMd, headers: { 'Content-Type': 'text/plain' } });
-  setSaveStatus(false);
-  updateSidebarStats();
-  toast('Saved ✓');
+// ── Summary ────────────────────────────────────
+function renderSummary(){
+  const tasks=allTasks();
+  const done=tasks.filter(t=>t.status==='done').length;
+  const inprog=tasks.filter(t=>t.status==='inprogress').length;
+  const overdue=tasks.filter(t=>isOverdue(t)).length;
+  document.getElementById('sm-total').textContent=tasks.length;
+  document.getElementById('sm-done').textContent=done;
+  document.getElementById('sm-inprog').textContent=inprog;
+  document.getElementById('sm-overdue').textContent=overdue;
+  const el=document.getElementById('sm-proj-list');
+  el.innerHTML=data.projects.map(p=>{
+    const tot=p.tasks.length, dn=p.tasks.filter(t=>t.status==='done').length;
+    const pct=tot?Math.round(dn/tot*100):0;
+    return `<div class="sum-proj">
+      <h4><span class="proj-dot" style="background:${p.color}"></span>${esc(p.name)}</h4>
+      <div class="sum-proj-bar"><div class="sum-proj-fill" style="width:${pct}%;background:${p.color}"></div></div>
+      <div style="font-size:12px;color:var(--muted)">${dn}/${tot} done · ${pct}%</div>
+    </div>`;
+  }).join('');
 }
 
-// ── Summary ────────────────────────────────────────────
-async function loadSummary() {
-  const r = await fetch(`${API}/summary`);
-  const data = await r.json();
-  document.getElementById('sum-total').textContent = data.total;
-  document.getElementById('sum-done').textContent = data.completed;
-  document.getElementById('sum-pending').textContent = data.pending;
-  const list = document.getElementById('sum-list');
-  const pending = data.tasks.filter(t => !t.done);
-  if (pending.length === 0) {
-    list.innerHTML = '<div class="empty">All done! 🎉</div>';
-    return;
-  }
-  list.innerHTML = pending.map(t => `
-    <div class="pending-item"><span class="dot"></span>${escHtml(t.text)}</div>
-  `).join('');
-}
+// ── Close modals on overlay click ─────────────
+document.querySelectorAll('.modal-overlay').forEach(o=>o.addEventListener('click',e=>{ if(e.target===o) o.classList.remove('open') }));
 
-// ── Sidebar stats ──────────────────────────────────────
-async function updateSidebarStats() {
-  const r = await fetch(`${API}/summary`);
-  const data = await r.json();
-  document.getElementById('s-total').textContent = data.total;
-  document.getElementById('s-done').textContent = data.completed;
-  const pct = data.total ? Math.round((data.completed / data.total) * 100) : 0;
-  document.getElementById('s-bar').style.width = pct + '%';
-}
-
-// ── Boot ───────────────────────────────────────────────
-(async () => {
-  await loadRaw();
-  renderList();
-  updateSidebarStats();
-})();
+// ── Boot ──────────────────────────────────────
+load();
 </script>
 </body>
 </html>

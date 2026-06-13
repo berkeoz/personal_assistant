@@ -1,0 +1,18 @@
+{
+  "projects": [
+    {
+      "id": "6867e32a-6654-4559-bdc6-98e8c364de20",
+      "name": "Personal",
+      "color": "#6c8eff",
+      "tasks": [
+        {
+          "id": "27a04794-dd3d-4782-865f-c088d79901a8",
+          "text": "Welcome! Edit or delete this task.",
+          "status": "todo",
+          "dueDate": null,
+          "tags": []
+        }
+      ]
+    }
+  ]
+}
