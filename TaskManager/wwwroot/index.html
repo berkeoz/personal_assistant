@@ -116,6 +116,18 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
 .kanban-add input:focus{border-color:var(--accent)}
 .new-col-btn{background:none;border:2px dashed var(--border);border-radius:var(--radius);min-width:200px;padding:20px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;cursor:pointer;color:var(--muted);font-size:13px;transition:border-color .15s,color .15s;flex-shrink:0}
 .new-col-btn:hover{border-color:var(--accent);color:var(--accent)}
+/* Column visibility toolbar */
+.kb-toolbar{display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding:4px 0}
+.kb-toolbar-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-right:4px}
+.col-vis-chip{padding:4px 10px;border-radius:20px;border:1px solid var(--border);background:none;color:var(--muted);cursor:pointer;font-size:12px;display:flex;align-items:center;gap:5px;transition:all .15s}
+.col-vis-chip.visible{background:var(--surface2);color:var(--text);border-color:var(--border)}
+.col-vis-chip.hidden{opacity:.45}
+/* Column drag handle */
+.kh-drag{cursor:grab;color:var(--muted);font-size:14px;padding:0 4px;opacity:0;transition:opacity .15s}
+.kanban-header:hover .kh-drag{opacity:1}
+.kanban-col.col-dragging{opacity:.35}
+.kanban-col.col-drop-before{border-left:3px solid var(--accent)}
+.kanban-col.col-drop-after{border-right:3px solid var(--accent)}
 
 /* Schedule */
 .schedule-section{margin-top:4px}
@@ -431,6 +443,8 @@ const API = 'http://localhost:5199/api';
 const COLORS = ['#6c8eff','#a78bfa','#34d399','#fbbf24','#f87171','#fb923c','#38bdf8','#f472b6','#94a3b8'];
 let data = { columns: [], projects: [], tasks: [] };
 let listFilter = 'all', kbProjFilter = null, pdFilter = 'all', pdProjectId = null;
+let hiddenCols = new Set();   // column IDs hidden in kanban
+let dragColId = null;         // column being dragged (for reorder)
 let editingTaskId = null, dragTaskId = null;
 let selectedColor = COLORS[0], selectedColColor = COLORS[0];
 let calYear = new Date().getFullYear(), calMonth = new Date().getMonth(), calSelectedDate = null;
@@ -666,26 +680,48 @@ async function saveEditTask(){
 
 // ── Kanban ─────────────────────────────────────
 function renderKanban(){
-  // project filter chips
+  // Project filter
   const kbf=document.getElementById('kb-proj-filter');
-  kbf.innerHTML=`<button class="chip ${!kbProjFilter?'active':''}" onclick="setKbFilter(null,this)">All Projects</button>`+
-    data.projects.map(p=>`<button class="chip ${kbProjFilter===p.id?'active':''}" onclick="setKbFilter('${p.id}',this)">${esc(p.name)}</button>`).join('');
+  kbf.innerHTML=`
+    <div class="kb-toolbar">
+      <span class="kb-toolbar-label">Project:</span>
+      <button class="chip ${!kbProjFilter?'active':''}" onclick="setKbFilter(null,this)">All</button>
+      ${data.projects.map(p=>`<button class="chip ${kbProjFilter===p.id?'active':''}" onclick="setKbFilter('${p.id}',this)">${esc(p.name)}</button>`).join('')}
+    </div>
+    <div class="kb-toolbar">
+      <span class="kb-toolbar-label">Columns:</span>
+      ${data.columns.map(col=>`
+        <button class="col-vis-chip ${hiddenCols.has(col.id)?'hidden':'visible'}" onclick="toggleColVisibility('${col.id}')">
+          <span style="width:8px;height:8px;border-radius:50%;background:${col.color};display:inline-block"></span>
+          ${esc(col.name)} ${hiddenCols.has(col.id)?'👁':'✓'}
+        </button>`).join('')}
+    </div>`;
 
   const tasks=data.tasks.filter(t=>!kbProjFilter||(t.projectIds||[]).includes(kbProjFilter));
+  const visibleCols=data.columns.filter(c=>!hiddenCols.has(c.id));
 
-  let html=data.columns.map(col=>{
+  let html=visibleCols.map(col=>{
     const cards=tasks.filter(t=>t.status===col.id);
     return `<div class="kanban-col" id="kbcol-${col.id}"
-      ondragover="kbDragOver(event,'${col.id}')" ondrop="kbDrop(event,'${col.id}')" ondragleave="kbDragLeave(event)">
+      draggable="true"
+      ondragstart="colDragStart(event,'${col.id}')"
+      ondragend="colDragEnd(event)"
+      ondragover="kbDragOver(event,'${col.id}')"
+      ondrop="kbDrop(event,'${col.id}')"
+      ondragleave="kbDragLeave(event)">
       <div class="kanban-header" style="border-top:3px solid ${col.color}">
+        <span class="kh-drag" title="Drag to reorder">⠿</span>
         <span class="kh-name" onclick="renameColumn('${col.id}')" title="Click to rename">${esc(col.name)}</span>
         <span class="kh-count">${cards.length}</span>
         <button class="kh-del" onclick="deleteColumn('${col.id}')" title="Delete column">×</button>
       </div>
       <div class="kanban-cards" id="kc-${col.id}">
         ${cards.map(t=>`
-          <div class="kanban-card" draggable="true" ondragstart="kbDragStart(event,'${t.id}')" ondragend="kbDragEnd(event)">
+          <div class="kanban-card" draggable="true"
+            ondragstart="kbDragStart(event,'${t.id}')"
+            ondragend="kbDragEnd(event)">
             <div class="kc-text">${esc(t.text)}</div>
+            ${t.notes?`<div style="font-size:11px;color:var(--muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(t.notes.slice(0,60))}</div>`:''}
             <div class="kc-meta">
               ${taskProjects(t).map(p=>`<span class="proj-tag" style="background:${p.color};font-size:10px;padding:1px 6px">${esc(p.name)}</span>`).join('')}
               ${t.dueDate?`<span class="due-tag ${isOverdue(t)?'overdue':isToday(t)?'today':''}">${fmtDate(t.dueDate)}</span>`:''}
@@ -702,13 +738,55 @@ function renderKanban(){
   document.getElementById('kanban-outer').innerHTML = html;
 }
 
+function toggleColVisibility(id){
+  if(hiddenCols.has(id)) hiddenCols.delete(id); else hiddenCols.add(id);
+  renderKanban();
+}
+
 function setKbFilter(id,btn){ kbProjFilter=id; document.querySelectorAll('#kb-proj-filter .chip').forEach(c=>c.classList.remove('active')); btn.classList.add('active'); renderKanban() }
 
-function kbDragStart(e,id){ dragTaskId=id; setTimeout(()=>document.getElementById('kbcol-'+findTask(id)?.status)?.querySelector('.kanban-card.dragging'),0); e.target.classList.add('dragging') }
-function kbDragEnd(e){ e.target.classList.remove('dragging'); document.querySelectorAll('.kanban-col').forEach(c=>c.classList.remove('drag-over')) }
-function kbDragOver(e,colId){ e.preventDefault(); document.querySelectorAll('.kanban-col').forEach(c=>c.classList.remove('drag-over')); document.getElementById('kbcol-'+colId)?.classList.add('drag-over') }
+// ── Task card drag (move between columns) ─────
+function kbDragStart(e,id){ e.stopPropagation(); dragTaskId=id; dragColId=null; e.target.classList.add('dragging') }
+function kbDragEnd(e){ e.target.classList.remove('dragging'); document.querySelectorAll('.kanban-col').forEach(c=>c.classList.remove('drag-over','col-dragging','col-drop-before','col-drop-after')) }
+function kbDragOver(e,colId){
+  e.preventDefault(); e.stopPropagation();
+  if(dragColId) return; // column reorder handled separately
+  document.querySelectorAll('.kanban-col').forEach(c=>c.classList.remove('drag-over'));
+  document.getElementById('kbcol-'+colId)?.classList.add('drag-over');
+}
 function kbDragLeave(e){ if(!e.currentTarget.contains(e.relatedTarget)) e.currentTarget.classList.remove('drag-over') }
-async function kbDrop(e,colId){ e.preventDefault(); document.querySelectorAll('.kanban-col').forEach(c=>c.classList.remove('drag-over')); if(!dragTaskId) return; await patchTask(dragTaskId,{status:colId}); dragTaskId=null }
+async function kbDrop(e,colId){
+  e.preventDefault(); e.stopPropagation();
+  document.querySelectorAll('.kanban-col').forEach(c=>c.classList.remove('drag-over','col-drop-before','col-drop-after'));
+  if(dragColId){ await handleColDrop(colId); return }
+  if(!dragTaskId) return;
+  await patchTask(dragTaskId,{status:colId}); dragTaskId=null;
+}
+
+// ── Column reorder drag ───────────────────────
+function colDragStart(e,id){
+  if(dragTaskId) return; // task drag takes priority
+  dragColId=id; dragTaskId=null;
+  e.currentTarget.classList.add('col-dragging');
+}
+function colDragEnd(e){
+  dragColId=null;
+  document.querySelectorAll('.kanban-col').forEach(c=>c.classList.remove('col-dragging','col-drop-before','col-drop-after','drag-over'));
+}
+async function handleColDrop(targetColId){
+  if(!dragColId||dragColId===targetColId) return;
+  const cols=[...data.columns];
+  const fromIdx=cols.findIndex(c=>c.id===dragColId);
+  const toIdx=cols.findIndex(c=>c.id===targetColId);
+  if(fromIdx===-1||toIdx===-1) return;
+  const [moved]=cols.splice(fromIdx,1);
+  cols.splice(toIdx,0,moved);
+  dragColId=null;
+  // Persist new order
+  const newData={...data, columns:cols};
+  await fetch(`${API}/data`,{method:'POST',body:JSON.stringify(newData),headers:{'Content-Type':'application/json'}});
+  await load(); toast('Column reordered');
+}
 
 async function kbQuickAdd(e,colId){
   if(e.key!=='Enter') return;
@@ -906,8 +984,9 @@ async function createProject(){
 
 // ── Summary ────────────────────────────────────
 function renderSummary(){
-  const done=data.tasks.filter(t=>t.status==='done').length;
-  const inprog=data.tasks.filter(t=>t.status!=='todo'&&t.status!=='done').length;
+  const done=data.tasks.filter(t=>isCompleted(t)).length;
+  const firstColId=data.columns[0]?.id;
+  const inprog=data.tasks.filter(t=>!isCompleted(t)&&t.status!==firstColId).length;
   const overdue=data.tasks.filter(t=>isOverdue(t)).length;
   document.getElementById('sm-total').textContent=data.tasks.length;
   document.getElementById('sm-done').textContent=done;
@@ -915,7 +994,7 @@ function renderSummary(){
   document.getElementById('sm-overdue').textContent=overdue;
   document.getElementById('sm-proj-list').innerHTML=data.projects.map(p=>{
     const tasks=data.tasks.filter(t=>(t.projectIds||[]).includes(p.id));
-    const dn=tasks.filter(t=>t.status==='done').length;
+    const dn=tasks.filter(t=>isCompleted(t)).length;
     const pct=tasks.length?Math.round(dn/tasks.length*100):0;
     return `<div class="sum-proj"><h4><span class="proj-dot" style="background:${p.color}"></span>${esc(p.name)}</h4>
       <div class="sum-proj-bar"><div class="sum-proj-fill" style="width:${pct}%;background:${p.color}"></div></div>
