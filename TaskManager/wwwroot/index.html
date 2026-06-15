@@ -4,6 +4,9 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>Personal Assistant</title>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
+<meta http-equiv="Pragma" content="no-cache"/>
+<meta http-equiv="Expires" content="0"/>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -236,6 +239,66 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
 .task-notes{font-size:12px;color:var(--muted);margin-top:4px;padding:6px 10px;background:var(--surface2);border-radius:6px;white-space:pre-wrap;line-height:1.5}
 .notes-toggle{background:none;border:none;color:var(--muted);cursor:pointer;font-size:11px;padding:2px 6px;border-radius:4px;transition:color .15s}
 .notes-toggle:hover{color:var(--accent)}
+
+/* Subtasks */
+.subtask-progress{font-size:11px;color:var(--muted);padding:2px 7px;background:var(--surface2);border-radius:10px;cursor:pointer;white-space:nowrap}
+.subtask-progress:hover{color:var(--accent)}
+.subtask-list{margin-top:6px;display:flex;flex-direction:column;gap:4px;padding-left:4px}
+.subtask-item{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);padding:3px 6px;border-radius:6px}
+.subtask-item:hover{background:var(--surface2)}
+.subtask-item input{accent-color:var(--green);width:13px;height:13px;cursor:pointer;flex-shrink:0}
+.subtask-item.done-sub{text-decoration:line-through;opacity:.5}
+/* Modal subtask editor */
+.subtask-editor{display:flex;flex-direction:column;gap:6px;max-height:200px;overflow-y:auto}
+.subtask-row{display:flex;align-items:center;gap:6px}
+.subtask-row input[type=text]{flex:1;background:var(--surface3);border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--text);font-size:12px;outline:none}
+.subtask-row input[type=text]:focus{border-color:var(--accent)}
+.subtask-row button{background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;padding:0 4px}
+.subtask-row button:hover{color:var(--red)}
+.add-subtask-row{display:flex;gap:6px;margin-top:2px}
+.add-subtask-row input{flex:1;background:var(--surface3);border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--text);font-size:12px;outline:none}
+.add-subtask-row input:focus{border-color:var(--accent)}
+
+/* Today view */
+.today-date{font-size:22px;font-weight:700;color:var(--text);margin-bottom:2px}
+.today-subtitle{font-size:13px;color:var(--muted);margin-bottom:4px}
+.today-section{margin-top:4px}
+.today-section-label{font-size:11px;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px;padding-left:2px;font-weight:600}
+
+/* Weekly view */
+.week-header{display:flex;align-items:center;gap:10px;margin-bottom:4px}
+.week-header h3{font-size:15px;font-weight:600;flex:1;text-align:center}
+.week-nav{background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;padding:2px 8px;border-radius:6px;transition:background .15s}
+.week-nav:hover{background:var(--surface2);color:var(--text)}
+.week-today-btn{background:var(--surface2);border:1px solid var(--border);color:var(--text);cursor:pointer;font-size:12px;padding:4px 12px;border-radius:6px}
+.week-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:10px;align-items:start}
+.week-col{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;min-height:120px}
+.week-col.is-today{border-color:var(--accent)}
+.week-col-header{padding:10px 12px 8px;border-bottom:1px solid var(--border);text-align:center}
+.week-col-day{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+.week-col-date{font-size:20px;font-weight:700;color:var(--text);line-height:1.2;margin-top:2px}
+.week-col.is-today .week-col-date{color:var(--accent)}
+.week-col-tasks{padding:8px;display:flex;flex-direction:column;gap:5px}
+.week-task{background:var(--surface2);border-radius:6px;padding:7px 9px;font-size:12px;border-left:3px solid var(--accent);cursor:pointer;transition:opacity .15s}
+.week-task:hover{opacity:.8}
+.week-task.done-wt{opacity:.4;text-decoration:line-through}
+.week-task.overdue-wt{border-left-color:var(--red)}
+.week-task .wt-proj{font-size:10px;color:var(--muted);margin-top:3px}
+.week-empty{font-size:11px;color:var(--surface3);text-align:center;padding:12px 0}
+
+/* Import */
+.import-zone{border:2px dashed var(--border);border-radius:var(--radius);padding:40px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s;position:relative}
+.import-zone:hover,.import-zone.dragover{border-color:var(--accent);background:var(--surface2)}
+.import-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer}
+.import-zone .iz-icon{font-size:36px;margin-bottom:8px}
+.import-zone .iz-text{font-size:14px;color:var(--muted)}
+.import-zone .iz-sub{font-size:12px;color:var(--muted);margin-top:4px;opacity:.6}
+.import-preview{display:flex;flex-direction:column;gap:6px;max-height:320px;overflow-y:auto}
+.import-event{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;display:flex;align-items:center;gap:10px}
+.import-event input{accent-color:var(--accent);width:15px;height:15px;cursor:pointer;flex-shrink:0}
+.import-event-body{flex:1;min-width:0}
+.import-event-title{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.import-event-date{font-size:11px;color:var(--muted);margin-top:2px}
 </style>
 </head>
 <body>
@@ -249,11 +312,14 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
     <button class="search-clear" id="search-clear" onclick="clearSearch()">×</button>
   </div>
   <div class="nav-section">Workspace</div>
+  <button class="nav-btn" onclick="switchView('today',this)" data-view="today"><span class="ic">☀️</span> Today</button>
   <button class="nav-btn active" onclick="switchView('list',this)" data-view="list"><span class="ic">✅</span> All Tasks</button>
+  <button class="nav-btn" onclick="switchView('week',this)" data-view="week"><span class="ic">📆</span> Week</button>
   <button class="nav-btn" onclick="switchView('kanban',this)" data-view="kanban"><span class="ic">📋</span> Kanban</button>
   <button class="nav-btn" onclick="switchView('schedule',this)" data-view="schedule"><span class="ic">📅</span> Schedule</button>
   <button class="nav-btn" onclick="switchView('calendar',this)" data-view="calendar"><span class="ic">🗓</span> Calendar</button>
   <button class="nav-btn" onclick="switchView('summary',this)" data-view="summary"><span class="ic">📊</span> Summary</button>
+  <button class="nav-btn" onclick="openImportModal()" style="color:var(--accent2)"><span class="ic">📥</span> Import .ics</button>
   <div class="nav-section">Projects</div>
   <div id="proj-nav"></div>
   <button class="nav-btn" onclick="openNewProjectModal()" style="color:var(--accent)"><span class="ic">＋</span> New Project</button>
@@ -382,6 +448,32 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
     <div class="sum-proj-list" id="sm-proj-list"></div>
   </div>
 
+  <!-- Today -->
+  <div class="view" id="view-today">
+    <div class="today-date" id="today-date"></div>
+    <div class="today-subtitle" id="today-subtitle"></div>
+    <div class="add-row" style="margin-top:4px">
+      <input class="flex1" id="td-text" type="text" placeholder="Add task for today… (Enter)"/>
+      <div class="mpick-wrap" id="td-mpick-wrap">
+        <button class="mpick-btn" id="td-mpick-btn" onclick="toggleMpick('td')" type="button">Projects ▾</button>
+        <div class="mpick-dropdown" id="td-mpick-dd"></div>
+      </div>
+      <button class="btn btn-primary" onclick="addTodayTask()">+ Add</button>
+    </div>
+    <div id="today-content"></div>
+  </div>
+
+  <!-- Week -->
+  <div class="view" id="view-week">
+    <div class="week-header">
+      <button class="week-nav" onclick="weekNav(-1)">‹</button>
+      <h3 id="week-title"></h3>
+      <button class="week-nav" onclick="weekNav(1)">›</button>
+      <button class="week-today-btn" onclick="weekGoToday()">This Week</button>
+    </div>
+    <div class="week-grid" id="week-grid"></div>
+  </div>
+
   <!-- Search -->
   <div class="view" id="view-search">
     <div id="search-results"></div>
@@ -415,10 +507,49 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
     </div>
     <div class="field"><label>Due Date</label><input id="mt-due" type="date"/></div>
     <div class="field"><label>Tags (comma separated)</label><input id="mt-tags" placeholder="work, urgent…"/></div>
-    <div class="field"><label>Notes</label><textarea id="mt-notes" rows="4" placeholder="Add notes, links, details…" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--text);font-size:13px;outline:none;resize:vertical;font-family:inherit;transition:border-color .15s"></textarea></div>
+    <div class="field">
+      <label>Subtasks</label>
+      <div class="subtask-editor" id="mt-subtask-list"></div>
+      <div class="add-subtask-row">
+        <input id="mt-subtask-input" type="text" placeholder="Add subtask… (Enter)"/>
+        <button class="btn btn-ghost btn-sm" onclick="addSubtaskInModal()">+ Add</button>
+      </div>
+    </div>
+    <div class="field"><label>Notes</label><textarea id="mt-notes" rows="3" placeholder="Add notes, links, details…" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--text);font-size:13px;outline:none;resize:vertical;font-family:inherit;transition:border-color .15s"></textarea></div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeModal('modal-task')">Cancel</button>
       <button class="btn btn-primary" onclick="saveEditTask()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Import ICS -->
+<div class="modal-overlay" id="modal-import">
+  <div class="modal" style="width:560px;max-width:98vw">
+    <h3>📥 Import Calendar (.ics)</h3>
+    <p style="font-size:12px;color:var(--muted)">Export from Google Calendar, Outlook, or Apple Calendar as .ics and drop it here. Events become tasks with due dates.</p>
+    <div class="import-zone" id="import-zone"
+      ondragover="importDragOver(event)" ondragleave="importDragLeave(event)" ondrop="importDrop(event)">
+      <input type="file" accept=".ics" onchange="importFileChosen(event)"/>
+      <div class="iz-icon">📅</div>
+      <div class="iz-text">Drop your .ics file here or click to browse</div>
+      <div class="iz-sub">Google Calendar · Outlook · Apple Calendar</div>
+    </div>
+    <div id="import-preview-wrap" style="display:none">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <span id="import-count" style="font-size:13px;color:var(--muted)"></span>
+        <button class="btn btn-ghost btn-sm" onclick="importSelectAll(true)">Select All</button>
+        <button class="btn btn-ghost btn-sm" onclick="importSelectAll(false)">None</button>
+        <div class="mpick-wrap" style="margin-left:auto" id="imp-mpick-wrap">
+          <button class="mpick-btn btn-sm" id="imp-mpick-btn" onclick="toggleMpick('imp')" type="button">Assign Project ▾</button>
+          <div class="mpick-dropdown" id="imp-mpick-dd"></div>
+        </div>
+      </div>
+      <div class="import-preview" id="import-preview"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modal-import')">Cancel</button>
+      <button class="btn btn-primary" id="import-btn" onclick="doImport()" style="display:none">Import Selected</button>
     </div>
   </div>
 </div>
@@ -557,7 +688,9 @@ function renderAll(){
 }
 
 function renderView(name){
-  if(name==='list') renderList();
+  if(name==='today') renderToday();
+  else if(name==='list') renderList();
+  else if(name==='week') renderWeek();
   else if(name==='kanban') renderKanban();
   else if(name==='schedule') renderSchedule();
   else if(name==='calendar') renderCalendar();
@@ -592,14 +725,23 @@ function taskItemHTML(t){
   const col = colById(t.status);
   const statusCls = done?'status-done':t.status==='todo'?'status-todo':'status-inprogress';
   const hasNotes = t.notes && t.notes.trim();
+  const subs = t.subtasks||[];
+  const subDone = subs.filter(s=>s.done).length;
+  const hasSubs = subs.length>0;
   return `<div class="task-item ${done?'done':''} ${over?'overdue':''}">
     <input class="task-cb" type="checkbox" ${done?'checked':''}
       onchange="toggleTask('${t.id}')"/>
     <div style="flex:1;min-width:0">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <span class="task-text">${esc(t.text)}</span>
+        ${hasSubs?`<span class="subtask-progress" onclick="toggleSubtaskList('${t.id}')">${subDone}/${subs.length} ✓</span>`:''}
         ${hasNotes?`<button class="notes-toggle" onclick="toggleNotes('${t.id}')">📋 notes</button>`:''}
       </div>
+      ${hasSubs?`<div class="subtask-list" id="sl-${t.id}" style="display:none">${subs.map((s,i)=>`
+        <div class="subtask-item ${s.done?'done-sub':''}">
+          <input type="checkbox" ${s.done?'checked':''} onchange="toggleSubtask('${t.id}',${i})"/>
+          <span>${esc(s.text)}</span>
+        </div>`).join('')}</div>`:''}
       ${hasNotes?`<div class="task-notes" id="tn-${t.id}" style="display:none">${esc(t.notes)}</div>`:''}
     </div>
     <div class="task-meta">
@@ -658,6 +800,8 @@ function openEditTask(id){
   document.getElementById('mt-due').value=t.dueDate?t.dueDate.slice(0,10):'';
   document.getElementById('mt-tags').value=(t.tags||[]).join(', ');
   document.getElementById('mt-notes').value=t.notes||'';
+  modalSubtasks=[...(t.subtasks||[]).map(s=>({...s}))];
+  renderModalSubtasks();
   // project checkboxes
   document.getElementById('mt-proj-list').innerHTML = data.projects.map(p=>`
     <label class="proj-check-item">
@@ -674,7 +818,11 @@ async function saveEditTask(){
   const tags=document.getElementById('mt-tags').value.split(',').map(s=>s.trim()).filter(Boolean);
   const pids=[...document.querySelectorAll('#mt-proj-list input:checked')].map(i=>i.value);
   const notes=document.getElementById('mt-notes').value.trim();
-  await patchTask(editingTaskId,{text,status,dueDate:due||null,tags,projectIds:pids,notes:notes||null});
+  // collect subtask text edits from inputs
+  const subInputs=document.querySelectorAll('#mt-subtask-list .subtask-row input[type=text]');
+  subInputs.forEach((inp,i)=>{ if(modalSubtasks[i]) modalSubtasks[i].text=inp.value.trim(); });
+  const subtasks=modalSubtasks.filter(s=>s.text);
+  await patchTask(editingTaskId,{text,status,dueDate:due||null,tags,projectIds:pids,notes:notes||null,subtasks});
   closeModal('modal-task'); toast('Saved');
 }
 
@@ -1000,6 +1148,170 @@ function renderSummary(){
       <div class="sum-proj-bar"><div class="sum-proj-fill" style="width:${pct}%;background:${p.color}"></div></div>
       <div style="font-size:12px;color:var(--muted)">${dn}/${tasks.length} done · ${pct}%</div></div>`;
   }).join('');
+}
+
+// ── Subtasks ──────────────────────────────────
+function toggleSubtaskList(id){ const el=document.getElementById('sl-'+id); if(el) el.style.display=el.style.display==='none'?'flex':'none'; }
+async function toggleSubtask(taskId, idx){
+  const t=findTask(taskId); if(!t) return;
+  const subs=[...(t.subtasks||[])];
+  subs[idx]={...subs[idx],done:!subs[idx].done};
+  await patchTask(taskId,{subtasks:subs});
+}
+let modalSubtasks=[];
+function renderModalSubtasks(){
+  document.getElementById('mt-subtask-list').innerHTML=modalSubtasks.map((s,i)=>`
+    <div class="subtask-row">
+      <input type="checkbox" ${s.done?'checked':''} onchange="modalSubtasks[${i}].done=this.checked"/>
+      <input type="text" value="${esc(s.text)}" oninput="modalSubtasks[${i}].text=this.value" placeholder="Subtask…"/>
+      <button onclick="modalSubtasks.splice(${i},1);renderModalSubtasks()">×</button>
+    </div>`).join('');
+}
+function addSubtaskInModal(){
+  const inp=document.getElementById('mt-subtask-input');
+  const text=inp.value.trim(); if(!text) return;
+  modalSubtasks.push({id:crypto.randomUUID(),text,done:false});
+  inp.value=''; renderModalSubtasks();
+}
+document.addEventListener('keydown',e=>{ if(e.key==='Enter'&&document.activeElement===document.getElementById('mt-subtask-input')) addSubtaskInModal(); });
+
+// ── Today view ─────────────────────────────────
+function renderToday(){
+  buildMpickDD('td');
+  const now=new Date();
+  const todayStr=now.toISOString().slice(0,10);
+  document.getElementById('today-date').textContent=now.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
+  const overdue=data.tasks.filter(t=>isOverdue(t));
+  const todayTasks=data.tasks.filter(t=>t.dueDate&&t.dueDate.slice(0,10)===todayStr&&!isOverdue(t));
+  const inProg=data.tasks.filter(t=>!isCompleted(t)&&t.status!==data.columns[0]?.id&&!t.dueDate);
+  const todayDone=data.tasks.filter(t=>isCompleted(t)&&t.dueDate&&t.dueDate.slice(0,10)===todayStr);
+  document.getElementById('today-subtitle').textContent=
+    `${overdue.length} overdue · ${todayTasks.length} due today · ${inProg.length} in progress`;
+  function section(label,color,tasks){
+    if(!tasks.length) return '';
+    return `<div class="today-section">
+      <div class="today-section-label" style="color:${color}">${label} (${tasks.length})</div>
+      <div class="task-list">${tasks.map(taskItemHTML).join('')}</div>
+    </div>`;
+  }
+  document.getElementById('today-content').innerHTML=
+    section('⚠ Overdue','var(--red)',overdue)+
+    section('Due Today','var(--green)',todayTasks)+
+    section('In Progress','var(--accent)',inProg)+
+    section('Completed Today','var(--muted)',todayDone)||
+    `<div class="empty">Nothing due today 🎉</div>`;
+}
+async function addTodayTask(){
+  const text=document.getElementById('td-text').value.trim(); if(!text) return;
+  const pids=getMpickIds('td');
+  const today=new Date().toISOString().slice(0,10);
+  await fetch(`${API}/tasks`,{method:'POST',body:JSON.stringify({text,dueDate:today,projectIds:pids,status:data.columns[0]?.id||'todo'}),headers:{'Content-Type':'application/json'}});
+  document.getElementById('td-text').value=''; clearMpick('td');
+  await load(); toast('Task added for today');
+}
+document.addEventListener('DOMContentLoaded',()=>{
+  const inp=document.getElementById('td-text');
+  if(inp) inp.addEventListener('keydown',e=>{ if(e.key==='Enter') addTodayTask(); });
+});
+
+// ── Weekly view ────────────────────────────────
+let weekOffset=0;
+function weekStart(offset=0){
+  const d=new Date(); d.setHours(0,0,0,0);
+  const day=d.getDay(); // 0=Sun
+  d.setDate(d.getDate()-day+1+(offset*7)); // start on Monday
+  return d;
+}
+function weekNav(dir){ weekOffset+=dir; renderWeek(); }
+function weekGoToday(){ weekOffset=0; renderWeek(); }
+function renderWeek(){
+  const mon=weekStart(weekOffset);
+  const sun=new Date(mon); sun.setDate(sun.getDate()+6);
+  document.getElementById('week-title').textContent=
+    mon.toLocaleDateString('en-US',{month:'short',day:'numeric'})+' – '+
+    sun.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+  const todayStr=new Date().toISOString().slice(0,10);
+  const taskMap={};
+  data.tasks.forEach(t=>{ if(!t.dueDate) return; const k=t.dueDate.slice(0,10); (taskMap[k]||(taskMap[k]=[])).push(t); });
+  const days=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  document.getElementById('week-grid').innerHTML=days.map((dayName,i)=>{
+    const d=new Date(mon); d.setDate(d.getDate()+i);
+    const dateStr=d.toISOString().slice(0,10);
+    const tasks=taskMap[dateStr]||[];
+    const isToday=dateStr===todayStr;
+    return `<div class="week-col ${isToday?'is-today':''}">
+      <div class="week-col-header">
+        <div class="week-col-day">${dayName}</div>
+        <div class="week-col-date">${d.getDate()}</div>
+      </div>
+      <div class="week-col-tasks">
+        ${tasks.length?tasks.map(t=>{
+          const projs=taskProjects(t);
+          const projColor=projs[0]?.color||'var(--accent)';
+          return `<div class="week-task ${isCompleted(t)?'done-wt':isOverdue(t)?'overdue-wt':''}"
+            style="border-left-color:${projColor}" onclick="openEditTask('${t.id}')">
+            ${esc(t.text)}
+            <div class="wt-proj">${projs.map(p=>esc(p.name)).join(', ')||'No project'}</div>
+          </div>`;
+        }).join(''):
+        `<div class="week-empty">—</div>`}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── ICS Import ─────────────────────────────────
+let importedEvents=[];
+function openImportModal(){ importedEvents=[]; document.getElementById('import-preview-wrap').style.display='none'; document.getElementById('import-btn').style.display='none'; buildMpickDD('imp'); openModal('modal-import'); }
+function importDragOver(e){ e.preventDefault(); document.getElementById('import-zone').classList.add('dragover'); }
+function importDragLeave(e){ document.getElementById('import-zone').classList.remove('dragover'); }
+function importDrop(e){ e.preventDefault(); document.getElementById('import-zone').classList.remove('dragover'); const f=e.dataTransfer.files[0]; if(f) readICSFile(f); }
+function importFileChosen(e){ const f=e.target.files[0]; if(f) readICSFile(f); }
+function readICSFile(file){ const r=new FileReader(); r.onload=e=>parseAndPreviewICS(e.target.result); r.readAsText(file); }
+
+function parseAndPreviewICS(text){
+  importedEvents=[];
+  const events=text.split('BEGIN:VEVENT');
+  for(let i=1;i<events.length;i++){
+    const block=events[i];
+    const get=(key)=>{ const m=block.match(new RegExp(key+'[^:]*:([^\r\n]+)')); return m?m[1].trim():null; };
+    const summary=get('SUMMARY')||'Untitled Event';
+    const desc=get('DESCRIPTION');
+    const dtstart=get('DTSTART')||get('DTSTART;VALUE=DATE')||get('DTSTART;TZID=[^:]+');
+    if(!dtstart) continue;
+    // Parse ICS date: 20260613T100000Z or 20260613
+    let dueDate=null;
+    const dm=dtstart.replace(/[^\d]/g,'');
+    if(dm.length>=8){
+      const y=dm.slice(0,4),mo=dm.slice(4,6),d=dm.slice(6,8);
+      dueDate=`${y}-${mo}-${d}`;
+      if(dm.length>=12){ dueDate+=`T${dm.slice(8,10)}:${dm.slice(10,12)}`; }
+    }
+    importedEvents.push({summary,description:desc,dueDate,selected:true});
+  }
+  document.getElementById('import-count').textContent=`${importedEvents.length} events found`;
+  document.getElementById('import-preview').innerHTML=importedEvents.map((ev,i)=>`
+    <div class="import-event">
+      <input type="checkbox" checked onchange="importedEvents[${i}].selected=this.checked"/>
+      <div class="import-event-body">
+        <div class="import-event-title">${esc(ev.summary)}</div>
+        <div class="import-event-date">${ev.dueDate?fmtDate(ev.dueDate):'No date'}</div>
+      </div>
+    </div>`).join('');
+  document.getElementById('import-preview-wrap').style.display='block';
+  document.getElementById('import-btn').style.display='block';
+}
+function importSelectAll(val){ importedEvents.forEach((_,i)=>{ importedEvents[i].selected=val; document.querySelectorAll('#import-preview input[type=checkbox]')[i].checked=val; }); }
+async function doImport(){
+  const pids=getMpickIds('imp');
+  const firstCol=data.columns[0]?.id||'todo';
+  const toImport=importedEvents.filter(e=>e.selected);
+  for(const ev of toImport){
+    await fetch(`${API}/tasks`,{method:'POST',body:JSON.stringify({text:ev.summary,notes:ev.description||null,dueDate:ev.dueDate||null,projectIds:pids,status:firstCol}),headers:{'Content-Type':'application/json'}});
+  }
+  closeModal('modal-import');
+  await load();
+  toast(`Imported ${toImport.length} events`);
 }
 
 // ── Search ─────────────────────────────────────
