@@ -286,6 +286,20 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
 .week-task .wt-proj{font-size:10px;color:var(--muted);margin-top:3px}
 .week-empty{font-size:11px;color:var(--surface3);text-align:center;padding:12px 0}
 
+/* Calendar connection items in sidebar */
+.cal-conn-item{display:flex;align-items:center;gap:7px;padding:6px 10px;border-radius:8px;font-size:12px;color:var(--muted)}
+.cal-conn-item:hover{background:var(--surface2)}
+.cal-conn-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.cal-conn-name{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cal-conn-status{font-size:10px}
+.cal-conn-status.ok{color:var(--green)}
+.cal-conn-status.error{color:var(--red)}
+.cal-conn-status.pending{color:var(--yellow)}
+.cal-conn-sync{background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;padding:0;transition:color .15s}
+.cal-conn-sync:hover{color:var(--accent)}
+.cal-conn-del{background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;padding:0;transition:color .15s;opacity:0}
+.cal-conn-item:hover .cal-conn-del{opacity:1}
+.cal-conn-del:hover{color:var(--red)}
 /* Import */
 .import-zone{border:2px dashed var(--border);border-radius:var(--radius);padding:40px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s;position:relative}
 .import-zone:hover,.import-zone.dragover{border-color:var(--accent);background:var(--surface2)}
@@ -320,6 +334,9 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
   <button class="nav-btn" onclick="switchView('calendar',this)" data-view="calendar"><span class="ic">🗓</span> Calendar</button>
   <button class="nav-btn" onclick="switchView('summary',this)" data-view="summary"><span class="ic">📊</span> Summary</button>
   <button class="nav-btn" onclick="openImportModal()" style="color:var(--accent2)"><span class="ic">📥</span> Import .ics</button>
+  <div class="nav-section">Calendar Sync <span id="cal-sync-badge" style="margin-left:auto;font-size:10px;color:var(--green)"></span></div>
+  <div id="cal-conn-list"></div>
+  <button class="nav-btn" onclick="openAddCalendarModal()" style="color:var(--accent2);font-size:12px;padding-left:18px"><span class="ic">＋</span> Add iCal URL</button>
   <div class="nav-section">Projects</div>
   <div id="proj-nav"></div>
   <button class="nav-btn" onclick="openNewProjectModal()" style="color:var(--accent)"><span class="ic">＋</span> New Project</button>
@@ -519,6 +536,29 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeModal('modal-task')">Cancel</button>
       <button class="btn btn-primary" onclick="saveEditTask()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Add Calendar Connection -->
+<div class="modal-overlay" id="modal-add-cal">
+  <div class="modal">
+    <h3>🔗 Add Calendar Sync</h3>
+    <p style="font-size:12px;color:var(--muted);line-height:1.6">
+      Get your private iCal URL from your calendar provider:<br>
+      <strong>Google</strong>: Settings → your calendar → "Secret address in iCal format"<br>
+      <strong>Outlook</strong>: Calendar → Share → Get a link → ICS<br>
+      <strong>Apple</strong>: Right-click calendar → Share → Public Calendar
+    </p>
+    <div class="field"><label>Name</label><input id="ac-name" placeholder="e.g. Work Calendar"/></div>
+    <div class="field"><label>iCal URL (.ics)</label><input id="ac-url" type="url" placeholder="https://calendar.google.com/calendar/ical/…/basic.ics"/></div>
+    <div class="field"><label>Color</label><div class="color-row" id="ac-color-row"></div></div>
+    <div class="field"><label>Assign to Project (optional)</label>
+      <select id="ac-project"><option value="">No project</option></select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modal-add-cal')">Cancel</button>
+      <button class="btn btn-primary" onclick="addCalendarConnection()">Connect & Sync Now</button>
     </div>
   </div>
 </div>
@@ -1150,6 +1190,79 @@ function renderSummary(){
   }).join('');
 }
 
+// ── Calendar Connections ───────────────────────
+let acColor = COLORS[0];
+
+async function renderCalConnections(){
+  const r = await fetch(`${API}/calendars`);
+  const conns = await r.json();
+  const el = document.getElementById('cal-conn-list');
+  el.innerHTML = conns.map(c=>{
+    const statusIcon = c.status==='ok'?'✓':c.status==='error'?'✗':'…';
+    const statusCls  = c.status==='ok'?'ok':c.status==='error'?'error':'pending';
+    const lastSync   = c.lastSynced?`synced ${c.lastSynced.slice(11,16)}`:'never synced';
+    return `<div class="cal-conn-item" title="${esc(c.url||'')}">
+      <span class="cal-conn-dot" style="background:${c.color||'var(--accent2)'}"></span>
+      <div style="flex:1;min-width:0">
+        <div class="cal-conn-name">${esc(c.name||'Calendar')}</div>
+        <div style="font-size:10px;color:var(--muted)">${lastSync}${c.lastCount?' · '+c.lastCount+' events':''}</div>
+      </div>
+      <span class="cal-conn-status ${statusCls}" title="${esc(c.lastError||statusIcon)}">${statusIcon}</span>
+      <button class="cal-conn-sync" onclick="syncCalendar('${c.id}')" title="Sync now">↺</button>
+      <button class="cal-conn-del"  onclick="deleteCalendar('${c.id}')" title="Remove">×</button>
+    </div>`;
+  }).join('') || '';
+
+  // Badge in section header
+  const syncing = conns.filter(c=>c.status==='pending').length;
+  const badge = document.getElementById('cal-sync-badge');
+  if(badge) badge.textContent = conns.length ? (syncing?'syncing…':conns.length+' connected') : '';
+}
+
+function openAddCalendarModal(){
+  document.getElementById('ac-name').value='';
+  document.getElementById('ac-url').value='';
+  acColor=COLORS[0];
+  document.getElementById('ac-color-row').innerHTML=COLORS.map(c=>
+    `<div class="color-swatch ${c===acColor?'selected':''}" style="background:${c}" onclick="acColor='${c}';document.querySelectorAll('#ac-color-row .color-swatch').forEach(s=>s.classList.remove('selected'));this.classList.add('selected')"></div>`).join('');
+  const sel=document.getElementById('ac-project');
+  sel.innerHTML='<option value="">No project</option>'+data.projects.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('');
+  openModal('modal-add-cal');
+}
+
+async function addCalendarConnection(){
+  const name=document.getElementById('ac-name').value.trim();
+  const url=document.getElementById('ac-url').value.trim();
+  const projId=document.getElementById('ac-project').value;
+  if(!name||!url){ toast('Name and URL are required'); return; }
+  if(!url.includes('.ics')&&!url.includes('ical')&&!url.includes('webcal')){
+    if(!confirm('URL does not look like an iCal link. Continue anyway?')) return;
+  }
+  await fetch(`${API}/calendars`,{method:'POST',body:JSON.stringify({name,url:url.replace('webcal://','https://'),color:acColor,projectId:projId||null}),headers:{'Content-Type':'application/json'}});
+  closeModal('modal-add-cal');
+  await load();
+  await renderCalConnections();
+  toast('Calendar connected — syncing now…');
+  // Poll for sync completion
+  setTimeout(async()=>{ await load(); await renderCalConnections(); },4000);
+}
+
+async function syncCalendar(id){
+  toast('Syncing…');
+  await fetch(`${API}/calendars/${id}/sync`,{method:'POST'});
+  await load();
+  await renderCalConnections();
+  toast('Sync complete');
+}
+
+async function deleteCalendar(id){
+  if(!confirm('Remove this calendar? All imported events will be deleted.')) return;
+  await fetch(`${API}/calendars/${id}`,{method:'DELETE'});
+  await load();
+  await renderCalConnections();
+  toast('Calendar removed');
+}
+
 // ── Subtasks ──────────────────────────────────
 function toggleSubtaskList(id){ const el=document.getElementById('sl-'+id); if(el) el.style.display=el.style.display==='none'?'flex':'none'; }
 async function toggleSubtask(taskId, idx){
@@ -1343,7 +1456,7 @@ function clearSearch(){ document.getElementById('global-search').value=''; docum
 document.querySelectorAll('.modal-overlay').forEach(o=>o.addEventListener('click',e=>{ if(e.target===o) o.classList.remove('open') }));
 
 // ── Boot ──────────────────────────────────────
-load();
+load().then(() => renderCalConnections());
 </script>
 </body>
 </html>
