@@ -33,3 +33,19 @@ Standard markdown checkboxes:
 ```
 
 The file is created automatically on first run and is excluded from git (add your own tasks without committing them).
+
+## Running on Vercel
+
+The repo root also contains a Vercel-ready port of the app: the same `index.html`
+UI, backed by serverless functions in `api/` (instead of the .NET API) that store
+data in Vercel KV (instead of `tasks.json`). `TaskManager/` (the local .NET app)
+is untouched and still works with `Start.ps1`.
+
+1. Import this repo in Vercel (New Project → this GitHub repo).
+2. Attach a KV store to the project (Storage tab → Create → KV) — this sets the
+   `KV_REST_API_URL` / `KV_REST_API_TOKEN` env vars the API routes need.
+3. Deploy. No build step or dependencies required.
+
+Calendar sync (`api/calendars/*`) runs on-demand ("Sync now" in the UI) rather
+than on an hourly timer, since serverless functions don't run background
+processes the way the local .NET host does.

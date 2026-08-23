@@ -1,0 +1,1462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Personal Assistant</title>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
+<meta http-equiv="Pragma" content="no-cache"/>
+<meta http-equiv="Expires" content="0"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0f1117;--surface:#1a1d27;--surface2:#22263a;--surface3:#2a2f47;
+  --border:#2e3250;--accent:#6c8eff;--accent2:#a78bfa;
+  --green:#34d399;--red:#f87171;--yellow:#fbbf24;--orange:#fb923c;
+  --text:#e2e8f0;--muted:#94a3b8;--radius:10px;
+}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;font-size:14px;display:flex;height:100vh;overflow:hidden}
+
+/* Sidebar */
+.sidebar{width:230px;min-width:230px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:16px 10px;gap:2px;overflow-y:auto}
+.sidebar-logo{font-size:15px;font-weight:700;color:var(--accent);padding:4px 10px 10px;letter-spacing:.5px}
+.search-wrap{position:relative;margin-bottom:6px}
+.search-wrap input{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:7px 28px 7px 30px;color:var(--text);font-size:13px;outline:none;transition:border-color .15s}
+.search-wrap input:focus{border-color:var(--accent)}
+.search-ic{position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:13px;pointer-events:none}
+.search-clear{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;line-height:1;display:none}
+.search-clear.visible{display:block}
+.nav-section{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);padding:10px 10px 4px}
+.nav-btn{background:none;border:none;color:var(--muted);cursor:pointer;padding:8px 10px;border-radius:8px;text-align:left;font-size:13px;display:flex;align-items:center;gap:8px;width:100%;transition:background .15s,color .15s}
+.nav-btn:hover{background:var(--surface2);color:var(--text)}
+.nav-btn.active{background:var(--surface2);color:var(--accent);font-weight:600}
+.nav-btn .ic{font-size:15px;width:18px;text-align:center}
+.nav-btn .badge{margin-left:auto;background:var(--surface3);color:var(--muted);font-size:11px;padding:1px 6px;border-radius:10px}
+.proj-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.sidebar-footer{margin-top:auto;padding-top:12px;border-top:1px solid var(--border)}
+.stats-mini{padding:10px;background:var(--surface2);border-radius:var(--radius);margin-top:8px}
+.stat-row{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:4px}
+.stat-row span{color:var(--text);font-weight:600}
+.prog-bar{height:3px;background:var(--border);border-radius:3px;overflow:hidden;margin-top:4px}
+.prog-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:3px;transition:width .4s}
+
+/* Main */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.view{flex:1;overflow:auto;padding:22px;display:none;flex-direction:column;gap:16px}
+.view.active{display:flex}
+
+/* Buttons */
+.btn{border:none;cursor:pointer;padding:7px 14px;border-radius:7px;font-size:13px;font-weight:500;transition:opacity .15s,transform .1s;white-space:nowrap}
+.btn:hover{opacity:.85}.btn:active{transform:scale(.97)}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-success{background:var(--green);color:#0f1117}
+.btn-danger{background:var(--red);color:#fff}
+.btn-ghost{background:var(--surface2);color:var(--text);border:1px solid var(--border)}
+.btn-sm{padding:4px 10px;font-size:12px;border-radius:6px}
+
+/* Add row */
+.add-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.add-row input,.add-row select{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-size:13px;outline:none;transition:border-color .15s}
+.add-row input:focus,.add-row select:focus{border-color:var(--accent)}
+.add-row input.flex1{flex:1;min-width:160px}
+
+/* Multi-project picker */
+.mpick-wrap{position:relative}
+.mpick-btn{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-size:13px;cursor:pointer;white-space:nowrap;min-width:130px;text-align:left;display:flex;align-items:center;justify-content:space-between;gap:6px}
+.mpick-btn:focus{outline:none;border-color:var(--accent)}
+.mpick-dropdown{position:absolute;top:calc(100% + 4px);left:0;min-width:180px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:6px;z-index:50;display:none;flex-direction:column;gap:2px;box-shadow:0 8px 24px #0006}
+.mpick-dropdown.open{display:flex}
+.mpick-option{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:7px;cursor:pointer;font-size:13px;transition:background .12s}
+.mpick-option:hover{background:var(--surface3)}
+.mpick-option input[type=checkbox]{accent-color:var(--accent);width:14px;height:14px;cursor:pointer;flex-shrink:0}
+
+/* Filters */
+.filter-row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.chip{padding:4px 12px;border-radius:20px;border:1px solid var(--border);background:none;color:var(--muted);cursor:pointer;font-size:12px;transition:all .15s}
+.chip.active{background:var(--accent);border-color:var(--accent);color:#fff}
+
+/* Task items */
+.task-list{display:flex;flex-direction:column;gap:5px}
+.task-item{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;display:flex;align-items:center;gap:10px;transition:border-color .15s}
+.task-item:hover{border-color:var(--accent)}
+.task-item.done{opacity:.5}
+.task-item.done .task-text{text-decoration:line-through}
+.task-item.overdue{border-color:var(--red)!important}
+.task-cb{width:16px;height:16px;cursor:pointer;accent-color:var(--accent);flex-shrink:0}
+.task-text{flex:1;font-size:13px}
+.task-meta{display:flex;gap:5px;align-items:center;flex-shrink:0;flex-wrap:wrap}
+.tag{font-size:11px;padding:2px 7px;border-radius:10px;background:var(--surface2);color:var(--accent2)}
+.proj-tag{font-size:11px;padding:2px 7px;border-radius:10px;color:#fff;white-space:nowrap}
+.due-tag{font-size:11px;padding:2px 7px;border-radius:10px;background:var(--surface2);color:var(--muted)}
+.due-tag.overdue{background:#3d1515;color:var(--red)}
+.due-tag.today{background:#1d2d1a;color:var(--green)}
+.status-badge{font-size:10px;padding:2px 7px;border-radius:10px;text-transform:uppercase;letter-spacing:.5px}
+.status-todo{background:var(--surface3);color:var(--muted)}
+.status-inprogress{background:#1a2a3d;color:var(--accent)}
+.status-done{background:#1a3028;color:var(--green)}
+.task-del{background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;line-height:1;padding:0 2px;transition:color .15s;flex-shrink:0}
+.task-del:hover{color:var(--red)}
+
+/* Kanban */
+.kanban-outer{display:flex;gap:14px;align-items:start;overflow-x:auto;padding-bottom:8px}
+.kanban-col{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);min-width:260px;width:260px;flex-shrink:0;overflow:hidden;display:flex;flex-direction:column}
+.kanban-col.drag-over .kanban-cards{background:var(--surface3)}
+.kanban-header{padding:11px 14px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border)}
+.kanban-header .kh-name{flex:1;cursor:pointer}
+.kanban-header .kh-name:hover{color:var(--accent)}
+.kh-count{font-size:11px;color:var(--muted);background:var(--surface2);padding:2px 7px;border-radius:10px}
+.kh-del{background:none;border:none;color:var(--muted);cursor:pointer;font-size:15px;line-height:1;padding:0;transition:color .15s;opacity:0}
+.kanban-header:hover .kh-del{opacity:1}
+.kh-del:hover{color:var(--red)}
+.kanban-cards{padding:8px;display:flex;flex-direction:column;gap:7px;min-height:60px;flex:1;transition:background .15s}
+.kanban-card{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;cursor:grab;transition:border-color .15s,box-shadow .15s;user-select:none}
+.kanban-card:hover{border-color:var(--accent);box-shadow:0 2px 12px #0006}
+.kanban-card.dragging{opacity:.35;cursor:grabbing}
+.kc-text{font-size:13px;margin-bottom:7px}
+.kc-meta{display:flex;gap:5px;flex-wrap:wrap;align-items:center}
+.kanban-add{padding:8px}
+.kanban-add input{width:100%;background:var(--surface3);border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--text);font-size:12px;outline:none}
+.kanban-add input:focus{border-color:var(--accent)}
+.new-col-btn{background:none;border:2px dashed var(--border);border-radius:var(--radius);min-width:200px;padding:20px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;cursor:pointer;color:var(--muted);font-size:13px;transition:border-color .15s,color .15s;flex-shrink:0}
+.new-col-btn:hover{border-color:var(--accent);color:var(--accent)}
+/* Column visibility toolbar */
+.kb-toolbar{display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding:4px 0}
+.kb-toolbar-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-right:4px}
+.col-vis-chip{padding:4px 10px;border-radius:20px;border:1px solid var(--border);background:none;color:var(--muted);cursor:pointer;font-size:12px;display:flex;align-items:center;gap:5px;transition:all .15s}
+.col-vis-chip.visible{background:var(--surface2);color:var(--text);border-color:var(--border)}
+.col-vis-chip.hidden{opacity:.45}
+/* Column drag handle */
+.kh-drag{cursor:grab;color:var(--muted);font-size:14px;padding:0 4px;opacity:0;transition:opacity .15s}
+.kanban-header:hover .kh-drag{opacity:1}
+.kanban-col.col-dragging{opacity:.35}
+.kanban-col.col-drop-before{border-left:3px solid var(--accent)}
+.kanban-col.col-drop-after{border-right:3px solid var(--accent)}
+
+/* Schedule */
+.schedule-section{margin-top:4px}
+.schedule-label{font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:8px;padding-left:2px}
+.schedule-item{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:11px 14px;display:flex;align-items:center;gap:12px;margin-bottom:5px}
+.schedule-item:hover{border-color:var(--accent)}
+.schedule-item.overdue{border-left:3px solid var(--red)}
+.schedule-item.today{border-left:3px solid var(--green)}
+.schedule-item.upcoming{border-left:3px solid var(--accent)}
+.schedule-item.done{opacity:.5}
+.schedule-item.done .si-text{text-decoration:line-through}
+.si-text{flex:1;font-size:13px}
+.si-date{min-width:110px;font-size:12px;color:var(--muted);text-align:right}
+.si-date.overdue{color:var(--red)}.si-date.today{color:var(--green)}
+
+/* Calendar */
+.cal-wrap{display:flex;gap:16px;align-items:start}
+.cal-grid-wrap{flex:1;min-width:0;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.cal-header{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--border)}
+.cal-header h3{flex:1;font-size:15px;font-weight:600;text-align:center}
+.cal-nav{background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;padding:2px 8px;border-radius:6px;transition:background .15s}
+.cal-nav:hover{background:var(--surface2);color:var(--text)}
+.cal-today-btn{background:var(--surface2);border:1px solid var(--border);color:var(--text);cursor:pointer;font-size:12px;padding:4px 12px;border-radius:6px}
+.cal-day-names{display:grid;grid-template-columns:repeat(7,1fr);border-bottom:1px solid var(--border)}
+.cal-day-name{text-align:center;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;padding:8px 0}
+.cal-days{display:grid;grid-template-columns:repeat(7,1fr)}
+.cal-cell{min-height:80px;border-right:1px solid var(--border);border-bottom:1px solid var(--border);padding:6px;cursor:pointer;transition:background .15s;position:relative}
+.cal-cell:nth-child(7n){border-right:none}
+.cal-cell:hover{background:var(--surface2)}
+.cal-cell.other-month .cal-num{color:var(--surface3)}
+.cal-cell.today .cal-num{background:var(--accent);color:#fff;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center}
+.cal-cell.selected{background:var(--surface2);outline:2px solid var(--accent)}
+.cal-num{font-size:12px;font-weight:600;color:var(--muted);width:22px;height:22px;display:flex;align-items:center;justify-content:center;margin-bottom:3px}
+.cal-dots{display:flex;flex-direction:column;gap:2px}
+.cal-dot{font-size:10px;padding:1px 5px;border-radius:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#fff;line-height:1.4}
+.cal-dot.overdue{outline:1px solid var(--red)}
+.cal-dot.done{opacity:.45}
+.cal-more{font-size:10px;color:var(--muted);padding-left:2px;margin-top:1px}
+.cal-day-panel{width:270px;flex-shrink:0;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;display:flex;flex-direction:column;gap:10px}
+.cal-day-panel h4{font-size:13px;font-weight:600}
+.cal-panel-tasks{display:flex;flex-direction:column;gap:6px}
+.cal-task{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px 12px;display:flex;align-items:center;gap:8px}
+.cal-task:hover{border-color:var(--accent)}
+.cal-task.done .cal-task-text{text-decoration:line-through;opacity:.5}
+.cal-task-text{flex:1;font-size:12px}
+
+/* Projects */
+.projects-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}
+.proj-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;cursor:pointer;transition:border-color .15s,box-shadow .15s}
+.proj-card:hover{border-color:var(--accent);box-shadow:0 2px 16px #0005}
+.proj-card-header{padding:14px 16px;display:flex;align-items:center;gap:10px}
+.proj-card-title{font-weight:600;font-size:14px;flex:1}
+.proj-card-bar{height:3px;background:var(--border)}
+.proj-card-fill{height:100%;border-radius:3px;transition:width .4s}
+.proj-card-body{padding:0 16px 14px;font-size:12px;color:var(--muted)}
+.proj-card-stats{display:flex;gap:16px;margin-top:8px;font-size:12px}
+.proj-stat{color:var(--muted)}.proj-stat strong{color:var(--text)}
+.new-proj-card{background:none;border:2px dashed var(--border);border-radius:var(--radius);padding:30px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;cursor:pointer;transition:border-color .15s,color .15s;color:var(--muted);font-size:13px}
+.new-proj-card:hover{border-color:var(--accent);color:var(--accent)}
+.back-btn{background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;display:flex;align-items:center;gap:6px;padding:0;margin-bottom:4px}
+.back-btn:hover{color:var(--text)}
+
+/* Summary */
+.summary-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.sum-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px}
+.sum-card .lbl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px}
+.sum-card .val{font-size:26px;font-weight:700}
+.sum-card.blue .val{color:var(--accent)}.sum-card.green .val{color:var(--green)}
+.sum-card.purple .val{color:var(--accent2)}.sum-card.orange .val{color:var(--orange)}
+.sum-proj-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px}
+.sum-proj{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px}
+.sum-proj h4{font-size:13px;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.sum-proj-bar{height:4px;background:var(--border);border-radius:4px;overflow:hidden;margin-bottom:6px}
+.sum-proj-fill{height:100%;border-radius:4px}
+
+/* Search */
+.search-section-label{font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:6px;padding-left:2px}
+.search-hit{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;display:flex;align-items:center;gap:10px;margin-bottom:5px;cursor:pointer;transition:border-color .15s}
+.search-hit:hover{border-color:var(--accent)}
+.search-hit .hit-text{flex:1;font-size:13px}
+.search-hit .hit-text mark{background:transparent;color:var(--accent);font-weight:700}
+.search-empty{color:var(--muted);text-align:center;padding:48px 0;font-size:13px}
+
+/* Modal */
+.modal-overlay{position:fixed;inset:0;background:#0009;display:none;align-items:center;justify-content:center;z-index:100}
+.modal-overlay.open{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:24px;width:440px;max-width:95vw;display:flex;flex-direction:column;gap:14px}
+.modal h3{font-size:15px;font-weight:600}
+.field{display:flex;flex-direction:column;gap:5px}
+.field label{font-size:12px;color:var(--muted)}
+.field input,.field select,.field textarea{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--text);font-size:13px;outline:none;transition:border-color .15s}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--accent)}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:4px}
+.color-row{display:flex;gap:8px;flex-wrap:wrap}
+.color-swatch{width:24px;height:24px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:border-color .15s}
+.color-swatch.selected{border-color:#fff}
+.proj-check-list{display:flex;flex-direction:column;gap:6px;max-height:180px;overflow-y:auto}
+.proj-check-item{display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:7px;cursor:pointer;transition:background .12s}
+.proj-check-item:hover{background:var(--surface2)}
+.proj-check-item input{accent-color:var(--accent);width:14px;height:14px;cursor:pointer}
+
+/* Toast */
+#toast{position:fixed;bottom:20px;right:20px;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:10px 18px;border-radius:8px;font-size:13px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:999}
+#toast.show{opacity:1}
+.empty{color:var(--muted);text-align:center;padding:40px;font-size:13px}
+.task-notes{font-size:12px;color:var(--muted);margin-top:4px;padding:6px 10px;background:var(--surface2);border-radius:6px;white-space:pre-wrap;line-height:1.5}
+.notes-toggle{background:none;border:none;color:var(--muted);cursor:pointer;font-size:11px;padding:2px 6px;border-radius:4px;transition:color .15s}
+.notes-toggle:hover{color:var(--accent)}
+
+/* Subtasks */
+.subtask-progress{font-size:11px;color:var(--muted);padding:2px 7px;background:var(--surface2);border-radius:10px;cursor:pointer;white-space:nowrap}
+.subtask-progress:hover{color:var(--accent)}
+.subtask-list{margin-top:6px;display:flex;flex-direction:column;gap:4px;padding-left:4px}
+.subtask-item{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);padding:3px 6px;border-radius:6px}
+.subtask-item:hover{background:var(--surface2)}
+.subtask-item input{accent-color:var(--green);width:13px;height:13px;cursor:pointer;flex-shrink:0}
+.subtask-item.done-sub{text-decoration:line-through;opacity:.5}
+/* Modal subtask editor */
+.subtask-editor{display:flex;flex-direction:column;gap:6px;max-height:200px;overflow-y:auto}
+.subtask-row{display:flex;align-items:center;gap:6px}
+.subtask-row input[type=text]{flex:1;background:var(--surface3);border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--text);font-size:12px;outline:none}
+.subtask-row input[type=text]:focus{border-color:var(--accent)}
+.subtask-row button{background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;padding:0 4px}
+.subtask-row button:hover{color:var(--red)}
+.add-subtask-row{display:flex;gap:6px;margin-top:2px}
+.add-subtask-row input{flex:1;background:var(--surface3);border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--text);font-size:12px;outline:none}
+.add-subtask-row input:focus{border-color:var(--accent)}
+
+/* Today view */
+.today-date{font-size:22px;font-weight:700;color:var(--text);margin-bottom:2px}
+.today-subtitle{font-size:13px;color:var(--muted);margin-bottom:4px}
+.today-section{margin-top:4px}
+.today-section-label{font-size:11px;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px;padding-left:2px;font-weight:600}
+
+/* Weekly view */
+.week-header{display:flex;align-items:center;gap:10px;margin-bottom:4px}
+.week-header h3{font-size:15px;font-weight:600;flex:1;text-align:center}
+.week-nav{background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;padding:2px 8px;border-radius:6px;transition:background .15s}
+.week-nav:hover{background:var(--surface2);color:var(--text)}
+.week-today-btn{background:var(--surface2);border:1px solid var(--border);color:var(--text);cursor:pointer;font-size:12px;padding:4px 12px;border-radius:6px}
+.week-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:10px;align-items:start}
+.week-col{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;min-height:120px}
+.week-col.is-today{border-color:var(--accent)}
+.week-col-header{padding:10px 12px 8px;border-bottom:1px solid var(--border);text-align:center}
+.week-col-day{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+.week-col-date{font-size:20px;font-weight:700;color:var(--text);line-height:1.2;margin-top:2px}
+.week-col.is-today .week-col-date{color:var(--accent)}
+.week-col-tasks{padding:8px;display:flex;flex-direction:column;gap:5px}
+.week-task{background:var(--surface2);border-radius:6px;padding:7px 9px;font-size:12px;border-left:3px solid var(--accent);cursor:pointer;transition:opacity .15s}
+.week-task:hover{opacity:.8}
+.week-task.done-wt{opacity:.4;text-decoration:line-through}
+.week-task.overdue-wt{border-left-color:var(--red)}
+.week-task .wt-proj{font-size:10px;color:var(--muted);margin-top:3px}
+.week-empty{font-size:11px;color:var(--surface3);text-align:center;padding:12px 0}
+
+/* Calendar connection items in sidebar */
+.cal-conn-item{display:flex;align-items:center;gap:7px;padding:6px 10px;border-radius:8px;font-size:12px;color:var(--muted)}
+.cal-conn-item:hover{background:var(--surface2)}
+.cal-conn-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.cal-conn-name{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cal-conn-status{font-size:10px}
+.cal-conn-status.ok{color:var(--green)}
+.cal-conn-status.error{color:var(--red)}
+.cal-conn-status.pending{color:var(--yellow)}
+.cal-conn-sync{background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;padding:0;transition:color .15s}
+.cal-conn-sync:hover{color:var(--accent)}
+.cal-conn-del{background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;padding:0;transition:color .15s;opacity:0}
+.cal-conn-item:hover .cal-conn-del{opacity:1}
+.cal-conn-del:hover{color:var(--red)}
+/* Import */
+.import-zone{border:2px dashed var(--border);border-radius:var(--radius);padding:40px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s;position:relative}
+.import-zone:hover,.import-zone.dragover{border-color:var(--accent);background:var(--surface2)}
+.import-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer}
+.import-zone .iz-icon{font-size:36px;margin-bottom:8px}
+.import-zone .iz-text{font-size:14px;color:var(--muted)}
+.import-zone .iz-sub{font-size:12px;color:var(--muted);margin-top:4px;opacity:.6}
+.import-preview{display:flex;flex-direction:column;gap:6px;max-height:320px;overflow-y:auto}
+.import-event{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;display:flex;align-items:center;gap:10px}
+.import-event input{accent-color:var(--accent);width:15px;height:15px;cursor:pointer;flex-shrink:0}
+.import-event-body{flex:1;min-width:0}
+.import-event-title{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.import-event-date{font-size:11px;color:var(--muted);margin-top:2px}
+</style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<nav class="sidebar">
+  <div class="sidebar-logo">⚡ Assistant</div>
+  <div class="search-wrap">
+    <span class="search-ic">🔍</span>
+    <input id="global-search" type="text" placeholder="Search tasks…" oninput="onSearch(this.value)" onkeydown="if(event.key==='Escape')clearSearch()"/>
+    <button class="search-clear" id="search-clear" onclick="clearSearch()">×</button>
+  </div>
+  <div class="nav-section">Workspace</div>
+  <button class="nav-btn" onclick="switchView('today',this)" data-view="today"><span class="ic">☀️</span> Today</button>
+  <button class="nav-btn active" onclick="switchView('list',this)" data-view="list"><span class="ic">✅</span> All Tasks</button>
+  <button class="nav-btn" onclick="switchView('week',this)" data-view="week"><span class="ic">📆</span> Week</button>
+  <button class="nav-btn" onclick="switchView('kanban',this)" data-view="kanban"><span class="ic">📋</span> Kanban</button>
+  <button class="nav-btn" onclick="switchView('schedule',this)" data-view="schedule"><span class="ic">📅</span> Schedule</button>
+  <button class="nav-btn" onclick="switchView('calendar',this)" data-view="calendar"><span class="ic">🗓</span> Calendar</button>
+  <button class="nav-btn" onclick="switchView('summary',this)" data-view="summary"><span class="ic">📊</span> Summary</button>
+  <button class="nav-btn" onclick="openImportModal()" style="color:var(--accent2)"><span class="ic">📥</span> Import .ics</button>
+  <div class="nav-section">Calendar Sync <span id="cal-sync-badge" style="margin-left:auto;font-size:10px;color:var(--green)"></span></div>
+  <div id="cal-conn-list"></div>
+  <button class="nav-btn" onclick="openAddCalendarModal()" style="color:var(--accent2);font-size:12px;padding-left:18px"><span class="ic">＋</span> Add iCal URL</button>
+  <div class="nav-section">Projects</div>
+  <div id="proj-nav"></div>
+  <button class="nav-btn" onclick="openNewProjectModal()" style="color:var(--accent)"><span class="ic">＋</span> New Project</button>
+  <div class="sidebar-footer">
+    <div class="stats-mini">
+      <div class="stat-row">Total <span id="s-total">–</span></div>
+      <div class="stat-row">Done <span id="s-done">–</span></div>
+      <div class="prog-bar"><div class="prog-fill" id="s-bar" style="width:0%"></div></div>
+    </div>
+  </div>
+</nav>
+
+<!-- Main -->
+<div class="main">
+
+  <!-- All Tasks -->
+  <div class="view active" id="view-list">
+    <div class="add-row">
+      <input class="flex1" id="li-text" type="text" placeholder="New task… (Enter)"/>
+      <div class="mpick-wrap" id="li-mpick-wrap">
+        <button class="mpick-btn" id="li-mpick-btn" onclick="toggleMpick('li')" type="button">Projects ▾</button>
+        <div class="mpick-dropdown" id="li-mpick-dd"></div>
+      </div>
+      <input id="li-due" type="date"/>
+      <button class="btn btn-primary" onclick="addTask()">+ Add</button>
+    </div>
+    <div class="filter-row">
+      <button class="chip active" onclick="setListFilter('all',this)">All</button>
+      <button class="chip" onclick="setListFilter('todo',this)">Todo</button>
+      <button class="chip" onclick="setListFilter('inprogress',this)">In Progress</button>
+      <button class="chip" onclick="setListFilter('done',this)">Done</button>
+      <button class="chip" onclick="setListFilter('overdue',this)">Overdue</button>
+    </div>
+    <div class="task-list" id="task-list"></div>
+  </div>
+
+  <!-- Kanban -->
+  <div class="view" id="view-kanban">
+    <div class="filter-row" id="kb-proj-filter"></div>
+    <div class="kanban-outer" id="kanban-outer"></div>
+  </div>
+
+  <!-- Schedule -->
+  <div class="view" id="view-schedule">
+    <div class="add-row">
+      <input class="flex1" id="sc-text" type="text" placeholder="Scheduled task…"/>
+      <div class="mpick-wrap" id="sc-mpick-wrap">
+        <button class="mpick-btn" id="sc-mpick-btn" onclick="toggleMpick('sc')" type="button">Projects ▾</button>
+        <div class="mpick-dropdown" id="sc-mpick-dd"></div>
+      </div>
+      <input id="sc-due" type="datetime-local"/>
+      <button class="btn btn-primary" onclick="addScheduledTask()">+ Add</button>
+    </div>
+    <div id="schedule-list"></div>
+  </div>
+
+  <!-- Calendar -->
+  <div class="view" id="view-calendar">
+    <div class="cal-wrap">
+      <div class="cal-grid-wrap">
+        <div class="cal-header">
+          <button class="cal-nav" onclick="calNav(-1)">‹</button>
+          <h3 id="cal-title"></h3>
+          <button class="cal-nav" onclick="calNav(1)">›</button>
+          <button class="cal-today-btn" onclick="calGoToday()">Today</button>
+        </div>
+        <div class="cal-day-names">
+          <div class="cal-day-name">Sun</div><div class="cal-day-name">Mon</div>
+          <div class="cal-day-name">Tue</div><div class="cal-day-name">Wed</div>
+          <div class="cal-day-name">Thu</div><div class="cal-day-name">Fri</div>
+          <div class="cal-day-name">Sat</div>
+        </div>
+        <div class="cal-days" id="cal-days"></div>
+      </div>
+      <div class="cal-day-panel">
+        <h4 id="cal-panel-title">Select a day</h4>
+        <div id="cal-add-row" style="display:none;flex-direction:column;gap:6px">
+          <input id="cal-task-text" type="text" placeholder="Add task for this day… (Enter)"
+            style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-size:13px;outline:none;width:100%"/>
+          <div class="mpick-wrap" id="cal-mpick-wrap" style="width:100%">
+            <button class="mpick-btn" id="cal-mpick-btn" onclick="toggleMpick('cal')" type="button" style="width:100%">Projects ▾</button>
+            <div class="mpick-dropdown" id="cal-mpick-dd"></div>
+          </div>
+          <button class="btn btn-primary" style="width:100%" onclick="addCalTask()">+ Add</button>
+        </div>
+        <div class="cal-panel-tasks" id="cal-panel-tasks"><div class="empty" style="padding:20px 0">Click a day to see tasks</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Projects -->
+  <div class="view" id="view-projects">
+    <div class="projects-grid" id="projects-grid"></div>
+  </div>
+
+  <!-- Project Detail -->
+  <div class="view" id="view-project-detail">
+    <button class="back-btn" onclick="switchView('projects',null)">← Back to Projects</button>
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <span id="pd-dot" class="proj-dot" style="width:12px;height:12px"></span>
+      <h2 id="pd-title" style="font-size:18px"></h2>
+      <button class="btn btn-danger btn-sm" onclick="deleteCurrentProject()">Delete Project</button>
+    </div>
+    <div class="add-row">
+      <input class="flex1" id="pd-text" type="text" placeholder="New task… (Enter)"/>
+      <input id="pd-due" type="date"/>
+      <button class="btn btn-primary" onclick="addTaskToProject()">+ Add</button>
+    </div>
+    <div class="filter-row">
+      <button class="chip active" onclick="setPdFilter('all',this)">All</button>
+      <button class="chip" onclick="setPdFilter('todo',this)">Todo</button>
+      <button class="chip" onclick="setPdFilter('inprogress',this)">In Progress</button>
+      <button class="chip" onclick="setPdFilter('done',this)">Done</button>
+    </div>
+    <div class="task-list" id="pd-task-list"></div>
+  </div>
+
+  <!-- Summary -->
+  <div class="view" id="view-summary">
+    <div class="summary-grid">
+      <div class="sum-card blue"><div class="lbl">Total Tasks</div><div class="val" id="sm-total">–</div></div>
+      <div class="sum-card green"><div class="lbl">Completed</div><div class="val" id="sm-done">–</div></div>
+      <div class="sum-card purple"><div class="lbl">In Progress</div><div class="val" id="sm-inprog">–</div></div>
+      <div class="sum-card orange"><div class="lbl">Overdue</div><div class="val" id="sm-overdue">–</div></div>
+    </div>
+    <div class="sum-proj-list" id="sm-proj-list"></div>
+  </div>
+
+  <!-- Today -->
+  <div class="view" id="view-today">
+    <div class="today-date" id="today-date"></div>
+    <div class="today-subtitle" id="today-subtitle"></div>
+    <div class="add-row" style="margin-top:4px">
+      <input class="flex1" id="td-text" type="text" placeholder="Add task for today… (Enter)"/>
+      <div class="mpick-wrap" id="td-mpick-wrap">
+        <button class="mpick-btn" id="td-mpick-btn" onclick="toggleMpick('td')" type="button">Projects ▾</button>
+        <div class="mpick-dropdown" id="td-mpick-dd"></div>
+      </div>
+      <button class="btn btn-primary" onclick="addTodayTask()">+ Add</button>
+    </div>
+    <div id="today-content"></div>
+  </div>
+
+  <!-- Week -->
+  <div class="view" id="view-week">
+    <div class="week-header">
+      <button class="week-nav" onclick="weekNav(-1)">‹</button>
+      <h3 id="week-title"></h3>
+      <button class="week-nav" onclick="weekNav(1)">›</button>
+      <button class="week-today-btn" onclick="weekGoToday()">This Week</button>
+    </div>
+    <div class="week-grid" id="week-grid"></div>
+  </div>
+
+  <!-- Search -->
+  <div class="view" id="view-search">
+    <div id="search-results"></div>
+  </div>
+
+</div>
+
+<!-- Modal: New Project -->
+<div class="modal-overlay" id="modal-proj">
+  <div class="modal">
+    <h3>New Project</h3>
+    <div class="field"><label>Name</label><input id="mp-name" placeholder="e.g. Work, Personal…"/></div>
+    <div class="field"><label>Color</label><div class="color-row" id="color-row"></div></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modal-proj')">Cancel</button>
+      <button class="btn btn-primary" onclick="createProject()">Create</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Edit Task -->
+<div class="modal-overlay" id="modal-task">
+  <div class="modal">
+    <h3>Edit Task</h3>
+    <div class="field"><label>Task</label><input id="mt-text"/></div>
+    <div class="field"><label>Status</label>
+      <select id="mt-status"></select>
+    </div>
+    <div class="field"><label>Projects</label>
+      <div class="proj-check-list" id="mt-proj-list"></div>
+    </div>
+    <div class="field"><label>Due Date</label><input id="mt-due" type="date"/></div>
+    <div class="field"><label>Tags (comma separated)</label><input id="mt-tags" placeholder="work, urgent…"/></div>
+    <div class="field">
+      <label>Subtasks</label>
+      <div class="subtask-editor" id="mt-subtask-list"></div>
+      <div class="add-subtask-row">
+        <input id="mt-subtask-input" type="text" placeholder="Add subtask… (Enter)"/>
+        <button class="btn btn-ghost btn-sm" onclick="addSubtaskInModal()">+ Add</button>
+      </div>
+    </div>
+    <div class="field"><label>Notes</label><textarea id="mt-notes" rows="3" placeholder="Add notes, links, details…" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--text);font-size:13px;outline:none;resize:vertical;font-family:inherit;transition:border-color .15s"></textarea></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modal-task')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveEditTask()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Add Calendar Connection -->
+<div class="modal-overlay" id="modal-add-cal">
+  <div class="modal">
+    <h3>🔗 Add Calendar Sync</h3>
+    <p style="font-size:12px;color:var(--muted);line-height:1.6">
+      Get your private iCal URL from your calendar provider:<br>
+      <strong>Google</strong>: Settings → your calendar → "Secret address in iCal format"<br>
+      <strong>Outlook</strong>: Calendar → Share → Get a link → ICS<br>
+      <strong>Apple</strong>: Right-click calendar → Share → Public Calendar
+    </p>
+    <div class="field"><label>Name</label><input id="ac-name" placeholder="e.g. Work Calendar"/></div>
+    <div class="field"><label>iCal URL (.ics)</label><input id="ac-url" type="url" placeholder="https://calendar.google.com/calendar/ical/…/basic.ics"/></div>
+    <div class="field"><label>Color</label><div class="color-row" id="ac-color-row"></div></div>
+    <div class="field"><label>Assign to Project (optional)</label>
+      <select id="ac-project"><option value="">No project</option></select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modal-add-cal')">Cancel</button>
+      <button class="btn btn-primary" onclick="addCalendarConnection()">Connect & Sync Now</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Import ICS -->
+<div class="modal-overlay" id="modal-import">
+  <div class="modal" style="width:560px;max-width:98vw">
+    <h3>📥 Import Calendar (.ics)</h3>
+    <p style="font-size:12px;color:var(--muted)">Export from Google Calendar, Outlook, or Apple Calendar as .ics and drop it here. Events become tasks with due dates.</p>
+    <div class="import-zone" id="import-zone"
+      ondragover="importDragOver(event)" ondragleave="importDragLeave(event)" ondrop="importDrop(event)">
+      <input type="file" accept=".ics" onchange="importFileChosen(event)"/>
+      <div class="iz-icon">📅</div>
+      <div class="iz-text">Drop your .ics file here or click to browse</div>
+      <div class="iz-sub">Google Calendar · Outlook · Apple Calendar</div>
+    </div>
+    <div id="import-preview-wrap" style="display:none">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <span id="import-count" style="font-size:13px;color:var(--muted)"></span>
+        <button class="btn btn-ghost btn-sm" onclick="importSelectAll(true)">Select All</button>
+        <button class="btn btn-ghost btn-sm" onclick="importSelectAll(false)">None</button>
+        <div class="mpick-wrap" style="margin-left:auto" id="imp-mpick-wrap">
+          <button class="mpick-btn btn-sm" id="imp-mpick-btn" onclick="toggleMpick('imp')" type="button">Assign Project ▾</button>
+          <div class="mpick-dropdown" id="imp-mpick-dd"></div>
+        </div>
+      </div>
+      <div class="import-preview" id="import-preview"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modal-import')">Cancel</button>
+      <button class="btn btn-primary" id="import-btn" onclick="doImport()" style="display:none">Import Selected</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: New Column -->
+<div class="modal-overlay" id="modal-col">
+  <div class="modal">
+    <h3>New Column</h3>
+    <div class="field"><label>Column Name</label><input id="mc-name" placeholder="e.g. Review, Blocked…"/></div>
+    <div class="field"><label>Color</label><div class="color-row" id="col-color-row"></div></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modal-col')">Cancel</button>
+      <button class="btn btn-primary" onclick="createColumn()">Create</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const API = '/api';
+const COLORS = ['#6c8eff','#a78bfa','#34d399','#fbbf24','#f87171','#fb923c','#38bdf8','#f472b6','#94a3b8'];
+let data = { columns: [], projects: [], tasks: [] };
+let listFilter = 'all', kbProjFilter = null, pdFilter = 'all', pdProjectId = null;
+let hiddenCols = new Set();   // column IDs hidden in kanban
+let dragColId = null;         // column being dragged (for reorder)
+let editingTaskId = null, dragTaskId = null;
+let selectedColor = COLORS[0], selectedColColor = COLORS[0];
+let calYear = new Date().getFullYear(), calMonth = new Date().getMonth(), calSelectedDate = null;
+let lastView = 'list';
+let searchTimeout = null;
+// multi-pick state per namespace
+const mpickState = {};
+
+// ── Utilities ─────────────────────────────────
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') }
+function toast(msg,dur=2200){ const e=document.getElementById('toast'); e.textContent=msg; e.classList.add('show'); setTimeout(()=>e.classList.remove('show'),dur) }
+function openModal(id){ document.getElementById(id).classList.add('open') }
+function closeModal(id){ document.getElementById(id).classList.remove('open') }
+function findTask(id){ return data.tasks.find(t=>t.id===id) }
+function findProject(id){ return data.projects.find(p=>p.id===id) }
+// Parse date strings as LOCAL time (avoid UTC-shift showing wrong day)
+function parseDate(s){ if(!s) return null; return s.length===10 ? new Date(s+'T00:00:00') : new Date(s) }
+// A task is visually "completed" if its column name suggests done/archived
+function isCompleted(t){ const col=colById(t.status); if(!col) return false; const n=col.name.toLowerCase(); return n==='done'||n.includes('archive')||n.includes('complet') }
+function isOverdue(t){ return t.dueDate && !isCompleted(t) && parseDate(t.dueDate)<new Date() }
+function isToday(t){ if(!t.dueDate) return false; const d=parseDate(t.dueDate); const n=new Date(); return d.toDateString()===n.toDateString() }
+function fmtDate(s){ if(!s) return ''; return parseDate(s).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) }
+function fmtDatetime(s){ if(!s) return ''; const dt=parseDate(s); return dt.toLocaleDateString('en-US',{month:'short',day:'numeric'})+' '+dt.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'}) }
+function taskProjects(t){ return (t.projectIds||[]).map(id=>findProject(id)).filter(Boolean) }
+function colById(id){ return data.columns.find(c=>c.id===id) }
+function statusLabel(colId){ return colById(colId)?.name || colId }
+
+// ── Multi-project picker ──────────────────────
+function initMpick(ns){ if(!mpickState[ns]) mpickState[ns]={selected:new Set()} }
+
+function buildMpickDD(ns){
+  initMpick(ns);
+  const dd = document.getElementById(ns+'-mpick-dd');
+  if(!dd) return;
+  dd.innerHTML = data.projects.map(p=>`
+    <div class="mpick-option" onclick="toggleMpickItem('${ns}','${p.id}',this)">
+      <input type="checkbox" id="mpck-${ns}-${p.id}" ${mpickState[ns].selected.has(p.id)?'checked':''}/>
+      <span class="proj-dot" style="background:${p.color}"></span>
+      <label for="mpck-${ns}-${p.id}" style="cursor:pointer">${esc(p.name)}</label>
+    </div>`).join('');
+  updateMpickBtn(ns);
+}
+
+function toggleMpick(ns){
+  initMpick(ns);
+  const dd = document.getElementById(ns+'-mpick-dd');
+  const isOpen = dd.classList.contains('open');
+  // close all
+  document.querySelectorAll('.mpick-dropdown').forEach(d=>d.classList.remove('open'));
+  if(!isOpen){ buildMpickDD(ns); dd.classList.add('open') }
+}
+
+function toggleMpickItem(ns, projId, row){
+  initMpick(ns);
+  const cb = row.querySelector('input[type=checkbox]');
+  if(mpickState[ns].selected.has(projId)){ mpickState[ns].selected.delete(projId); cb.checked=false }
+  else { mpickState[ns].selected.add(projId); cb.checked=true }
+  updateMpickBtn(ns);
+}
+
+function updateMpickBtn(ns){
+  initMpick(ns);
+  const sel = mpickState[ns].selected;
+  const btn = document.getElementById(ns+'-mpick-btn');
+  if(!btn) return;
+  if(sel.size===0) btn.textContent='Projects ▾';
+  else if(sel.size===1){ const p=findProject([...sel][0]); btn.textContent=(p?.name||'1 project')+' ▾' }
+  else btn.textContent=sel.size+' projects ▾';
+}
+
+function getMpickIds(ns){ initMpick(ns); return [...mpickState[ns].selected] }
+function setMpickIds(ns, ids){ initMpick(ns); mpickState[ns].selected=new Set(ids); updateMpickBtn(ns) }
+function clearMpick(ns){ initMpick(ns); mpickState[ns].selected.clear(); updateMpickBtn(ns) }
+
+// close dropdowns on outside click
+document.addEventListener('click', e=>{
+  if(!e.target.closest('.mpick-wrap')) document.querySelectorAll('.mpick-dropdown').forEach(d=>d.classList.remove('open'));
+});
+
+// ── Data ──────────────────────────────────────
+async function load(){
+  const r = await fetch(`${API}/data`);
+  data = await r.json();
+  if(!data.columns) data.columns=[];
+  if(!data.projects) data.projects=[];
+  if(!data.tasks) data.tasks=[];
+  renderAll();
+}
+
+async function patchTask(id, fields){
+  await fetch(`${API}/tasks/${id}`,{method:'PATCH',body:JSON.stringify(fields),headers:{'Content-Type':'application/json'}});
+  await load();
+}
+async function delTask(id){ await fetch(`${API}/tasks/${id}`,{method:'DELETE'}); await load() }
+
+// ── View switching ─────────────────────────────
+function switchView(name, btn){
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('view-'+name).classList.add('active');
+  if(btn) btn.classList.add('active');
+  document.querySelectorAll(`[data-view="${name}"]`).forEach(b=>b.classList.add('active'));
+  renderView(name);
+}
+
+function renderAll(){
+  renderProjNav(); renderSidebarStats();
+  const active = document.querySelector('.view.active');
+  if(active) renderView(active.id.replace('view-',''));
+}
+
+function renderView(name){
+  if(name==='today') renderToday();
+  else if(name==='list') renderList();
+  else if(name==='week') renderWeek();
+  else if(name==='kanban') renderKanban();
+  else if(name==='schedule') renderSchedule();
+  else if(name==='calendar') renderCalendar();
+  else if(name==='projects') renderProjects();
+  else if(name==='project-detail') renderProjectDetail();
+  else if(name==='summary') renderSummary();
+}
+
+// ── Sidebar ────────────────────────────────────
+function renderProjNav(){
+  document.getElementById('proj-nav').innerHTML = data.projects.map(p=>{
+    const cnt = data.tasks.filter(t=>(t.projectIds||[]).includes(p.id)).length;
+    return `<button class="nav-btn" style="padding-left:18px;font-size:12px" onclick="openProject('${p.id}')">
+      <span class="proj-dot" style="background:${p.color}"></span>${esc(p.name)}
+      <span class="badge">${cnt}</span></button>`;
+  }).join('');
+}
+function renderSidebarStats(){
+  const done = data.tasks.filter(t=>t.status==='done').length;
+  const total = data.tasks.length;
+  document.getElementById('s-total').textContent=total;
+  document.getElementById('s-done').textContent=done;
+  document.getElementById('s-bar').style.width=(total?Math.round(done/total*100):0)+'%';
+}
+
+// ── Task item HTML ─────────────────────────────
+function taskItemHTML(t){
+  const over=isOverdue(t), tod=isToday(t), done=isCompleted(t);
+  const dueLabel = over?`⚠ ${fmtDate(t.dueDate)}`:tod?'Today':t.dueDate?fmtDate(t.dueDate):'';
+  const dueClass = over?'overdue':tod?'today':'';
+  const projs = taskProjects(t);
+  const col = colById(t.status);
+  const statusCls = done?'status-done':t.status==='todo'?'status-todo':'status-inprogress';
+  const hasNotes = t.notes && t.notes.trim();
+  const subs = t.subtasks||[];
+  const subDone = subs.filter(s=>s.done).length;
+  const hasSubs = subs.length>0;
+  return `<div class="task-item ${done?'done':''} ${over?'overdue':''}">
+    <input class="task-cb" type="checkbox" ${done?'checked':''}
+      onchange="toggleTask('${t.id}')"/>
+    <div style="flex:1;min-width:0">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <span class="task-text">${esc(t.text)}</span>
+        ${hasSubs?`<span class="subtask-progress" onclick="toggleSubtaskList('${t.id}')">${subDone}/${subs.length} ✓</span>`:''}
+        ${hasNotes?`<button class="notes-toggle" onclick="toggleNotes('${t.id}')">📋 notes</button>`:''}
+      </div>
+      ${hasSubs?`<div class="subtask-list" id="sl-${t.id}" style="display:none">${subs.map((s,i)=>`
+        <div class="subtask-item ${s.done?'done-sub':''}">
+          <input type="checkbox" ${s.done?'checked':''} onchange="toggleSubtask('${t.id}',${i})"/>
+          <span>${esc(s.text)}</span>
+        </div>`).join('')}</div>`:''}
+      ${hasNotes?`<div class="task-notes" id="tn-${t.id}" style="display:none">${esc(t.notes)}</div>`:''}
+    </div>
+    <div class="task-meta">
+      ${(t.tags||[]).map(tg=>`<span class="tag">#${esc(tg)}</span>`).join('')}
+      ${projs.map(p=>`<span class="proj-tag" style="background:${p.color}">${esc(p.name)}</span>`).join('')}
+      <span class="status-badge ${statusCls}">${esc(col?.name||t.status)}</span>
+      ${dueLabel?`<span class="due-tag ${dueClass}">${dueLabel}</span>`:''}
+      <button class="btn btn-ghost btn-sm" onclick="openEditTask('${t.id}')">✏</button>
+      <button class="task-del" onclick="confirmDel('${t.id}')">×</button>
+    </div>
+  </div>`;
+}
+function toggleNotes(id){ const el=document.getElementById('tn-'+id); if(el) el.style.display=el.style.display==='none'?'block':'none'; }
+
+async function toggleTask(id){
+  const t = findTask(id); if(!t) return;
+  const cols = data.columns;
+  const doneCol = cols.find(c=>{ const n=c.name.toLowerCase(); return n==='done'||n.includes('archive')||n.includes('complet') }) || cols[cols.length-1];
+  const firstCol = cols[0];
+  await patchTask(id, { status: isCompleted(t) ? firstCol.id : doneCol.id });
+}
+async function confirmDel(id){ if(confirm('Delete this task?')){ await delTask(id); toast('Deleted') } }
+
+// ── All Tasks ──────────────────────────────────
+function setListFilter(f,btn){ listFilter=f; document.querySelectorAll('#view-list .chip').forEach(c=>c.classList.remove('active')); btn.classList.add('active'); renderList() }
+
+function renderList(){
+  const now=new Date();
+  let tasks=data.tasks;
+  if(listFilter==='todo') tasks=tasks.filter(t=>t.status==='todo');
+  else if(listFilter==='inprogress') tasks=tasks.filter(t=>t.status!=='todo'&&t.status!=='done');
+  else if(listFilter==='done') tasks=tasks.filter(t=>t.status==='done');
+  else if(listFilter==='overdue') tasks=tasks.filter(t=>isOverdue(t));
+  document.getElementById('task-list').innerHTML = tasks.length ? tasks.map(taskItemHTML).join('') : `<div class="empty">No tasks here.</div>`;
+  buildMpickDD('li');
+}
+
+async function addTask(){
+  const text=document.getElementById('li-text').value.trim();
+  const due=document.getElementById('li-due').value;
+  const pids=getMpickIds('li');
+  if(!text) return;
+  await fetch(`${API}/tasks`,{method:'POST',body:JSON.stringify({text,dueDate:due||null,projectIds:pids,status:'todo'}),headers:{'Content-Type':'application/json'}});
+  document.getElementById('li-text').value=''; document.getElementById('li-due').value=''; clearMpick('li');
+  await load(); toast('Task added');
+}
+document.getElementById('li-text').addEventListener('keydown',e=>{ if(e.key==='Enter') addTask() });
+
+// ── Edit Task Modal ────────────────────────────
+function openEditTask(id){
+  const t=findTask(id); if(!t) return;
+  editingTaskId=id;
+  document.getElementById('mt-text').value=t.text||'';
+  // populate status select from columns
+  document.getElementById('mt-status').innerHTML = data.columns.map(c=>`<option value="${c.id}" ${t.status===c.id?'selected':''}>${esc(c.name)}</option>`).join('');
+  document.getElementById('mt-due').value=t.dueDate?t.dueDate.slice(0,10):'';
+  document.getElementById('mt-tags').value=(t.tags||[]).join(', ');
+  document.getElementById('mt-notes').value=t.notes||'';
+  modalSubtasks=[...(t.subtasks||[]).map(s=>({...s}))];
+  renderModalSubtasks();
+  // project checkboxes
+  document.getElementById('mt-proj-list').innerHTML = data.projects.map(p=>`
+    <label class="proj-check-item">
+      <input type="checkbox" value="${p.id}" ${(t.projectIds||[]).includes(p.id)?'checked':''}/>
+      <span class="proj-dot" style="background:${p.color}"></span>${esc(p.name)}
+    </label>`).join('');
+  openModal('modal-task');
+}
+
+async function saveEditTask(){
+  const text=document.getElementById('mt-text').value.trim(); if(!text) return;
+  const status=document.getElementById('mt-status').value;
+  const due=document.getElementById('mt-due').value;
+  const tags=document.getElementById('mt-tags').value.split(',').map(s=>s.trim()).filter(Boolean);
+  const pids=[...document.querySelectorAll('#mt-proj-list input:checked')].map(i=>i.value);
+  const notes=document.getElementById('mt-notes').value.trim();
+  // collect subtask text edits from inputs
+  const subInputs=document.querySelectorAll('#mt-subtask-list .subtask-row input[type=text]');
+  subInputs.forEach((inp,i)=>{ if(modalSubtasks[i]) modalSubtasks[i].text=inp.value.trim(); });
+  const subtasks=modalSubtasks.filter(s=>s.text);
+  await patchTask(editingTaskId,{text,status,dueDate:due||null,tags,projectIds:pids,notes:notes||null,subtasks});
+  closeModal('modal-task'); toast('Saved');
+}
+
+// ── Kanban ─────────────────────────────────────
+function renderKanban(){
+  // Project filter
+  const kbf=document.getElementById('kb-proj-filter');
+  kbf.innerHTML=`
+    <div class="kb-toolbar">
+      <span class="kb-toolbar-label">Project:</span>
+      <button class="chip ${!kbProjFilter?'active':''}" onclick="setKbFilter(null,this)">All</button>
+      ${data.projects.map(p=>`<button class="chip ${kbProjFilter===p.id?'active':''}" onclick="setKbFilter('${p.id}',this)">${esc(p.name)}</button>`).join('')}
+    </div>
+    <div class="kb-toolbar">
+      <span class="kb-toolbar-label">Columns:</span>
+      ${data.columns.map(col=>`
+        <button class="col-vis-chip ${hiddenCols.has(col.id)?'hidden':'visible'}" onclick="toggleColVisibility('${col.id}')">
+          <span style="width:8px;height:8px;border-radius:50%;background:${col.color};display:inline-block"></span>
+          ${esc(col.name)} ${hiddenCols.has(col.id)?'👁':'✓'}
+        </button>`).join('')}
+    </div>`;
+
+  const tasks=data.tasks.filter(t=>!kbProjFilter||(t.projectIds||[]).includes(kbProjFilter));
+  const visibleCols=data.columns.filter(c=>!hiddenCols.has(c.id));
+
+  let html=visibleCols.map(col=>{
+    const cards=tasks.filter(t=>t.status===col.id);
+    return `<div class="kanban-col" id="kbcol-${col.id}"
+      draggable="true"
+      ondragstart="colDragStart(event,'${col.id}')"
+      ondragend="colDragEnd(event)"
+      ondragover="kbDragOver(event,'${col.id}')"
+      ondrop="kbDrop(event,'${col.id}')"
+      ondragleave="kbDragLeave(event)">
+      <div class="kanban-header" style="border-top:3px solid ${col.color}">
+        <span class="kh-drag" title="Drag to reorder">⠿</span>
+        <span class="kh-name" onclick="renameColumn('${col.id}')" title="Click to rename">${esc(col.name)}</span>
+        <span class="kh-count">${cards.length}</span>
+        <button class="kh-del" onclick="deleteColumn('${col.id}')" title="Delete column">×</button>
+      </div>
+      <div class="kanban-cards" id="kc-${col.id}">
+        ${cards.map(t=>`
+          <div class="kanban-card" draggable="true"
+            ondragstart="kbDragStart(event,'${t.id}')"
+            ondragend="kbDragEnd(event)">
+            <div class="kc-text">${esc(t.text)}</div>
+            ${t.notes?`<div style="font-size:11px;color:var(--muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(t.notes.slice(0,60))}</div>`:''}
+            <div class="kc-meta">
+              ${taskProjects(t).map(p=>`<span class="proj-tag" style="background:${p.color};font-size:10px;padding:1px 6px">${esc(p.name)}</span>`).join('')}
+              ${t.dueDate?`<span class="due-tag ${isOverdue(t)?'overdue':isToday(t)?'today':''}">${fmtDate(t.dueDate)}</span>`:''}
+              <button class="btn btn-ghost btn-sm" style="margin-left:auto;padding:2px 7px" onclick="openEditTask('${t.id}')">✏</button>
+              <button class="task-del" onclick="confirmDel('${t.id}')">×</button>
+            </div>
+          </div>`).join('')}
+      </div>
+      <div class="kanban-add"><input placeholder="+ Quick add to ${esc(col.name)}…" onkeydown="kbQuickAdd(event,'${col.id}')"/></div>
+    </div>`;
+  }).join('');
+
+  html += `<div class="new-col-btn" onclick="openNewColumnModal()"><span style="font-size:22px">＋</span>Add Column</div>`;
+  document.getElementById('kanban-outer').innerHTML = html;
+}
+
+function toggleColVisibility(id){
+  if(hiddenCols.has(id)) hiddenCols.delete(id); else hiddenCols.add(id);
+  renderKanban();
+}
+
+function setKbFilter(id,btn){ kbProjFilter=id; document.querySelectorAll('#kb-proj-filter .chip').forEach(c=>c.classList.remove('active')); btn.classList.add('active'); renderKanban() }
+
+// ── Task card drag (move between columns) ─────
+function kbDragStart(e,id){ e.stopPropagation(); dragTaskId=id; dragColId=null; e.target.classList.add('dragging') }
+function kbDragEnd(e){ e.target.classList.remove('dragging'); document.querySelectorAll('.kanban-col').forEach(c=>c.classList.remove('drag-over','col-dragging','col-drop-before','col-drop-after')) }
+function kbDragOver(e,colId){
+  e.preventDefault(); e.stopPropagation();
+  if(dragColId) return; // column reorder handled separately
+  document.querySelectorAll('.kanban-col').forEach(c=>c.classList.remove('drag-over'));
+  document.getElementById('kbcol-'+colId)?.classList.add('drag-over');
+}
+function kbDragLeave(e){ if(!e.currentTarget.contains(e.relatedTarget)) e.currentTarget.classList.remove('drag-over') }
+async function kbDrop(e,colId){
+  e.preventDefault(); e.stopPropagation();
+  document.querySelectorAll('.kanban-col').forEach(c=>c.classList.remove('drag-over','col-drop-before','col-drop-after'));
+  if(dragColId){ await handleColDrop(colId); return }
+  if(!dragTaskId) return;
+  await patchTask(dragTaskId,{status:colId}); dragTaskId=null;
+}
+
+// ── Column reorder drag ───────────────────────
+function colDragStart(e,id){
+  if(dragTaskId) return; // task drag takes priority
+  dragColId=id; dragTaskId=null;
+  e.currentTarget.classList.add('col-dragging');
+}
+function colDragEnd(e){
+  dragColId=null;
+  document.querySelectorAll('.kanban-col').forEach(c=>c.classList.remove('col-dragging','col-drop-before','col-drop-after','drag-over'));
+}
+async function handleColDrop(targetColId){
+  if(!dragColId||dragColId===targetColId) return;
+  const cols=[...data.columns];
+  const fromIdx=cols.findIndex(c=>c.id===dragColId);
+  const toIdx=cols.findIndex(c=>c.id===targetColId);
+  if(fromIdx===-1||toIdx===-1) return;
+  const [moved]=cols.splice(fromIdx,1);
+  cols.splice(toIdx,0,moved);
+  dragColId=null;
+  // Persist new order
+  const newData={...data, columns:cols};
+  await fetch(`${API}/data`,{method:'POST',body:JSON.stringify(newData),headers:{'Content-Type':'application/json'}});
+  await load(); toast('Column reordered');
+}
+
+async function kbQuickAdd(e,colId){
+  if(e.key!=='Enter') return;
+  const text=e.target.value.trim(); if(!text) return;
+  await fetch(`${API}/tasks`,{method:'POST',body:JSON.stringify({text,status:colId,projectIds:[]}),headers:{'Content-Type':'application/json'}});
+  e.target.value=''; await load(); toast('Task added');
+}
+
+async function renameColumn(id){
+  const col=colById(id); if(!col) return;
+  const name=prompt('Rename column:',col.name); if(!name||name===col.name) return;
+  await fetch(`${API}/columns/${id}`,{method:'PATCH',body:JSON.stringify({name}),headers:{'Content-Type':'application/json'}});
+  await load(); toast('Column renamed');
+}
+
+async function deleteColumn(id){
+  if(data.columns.length<=1){ toast('Cannot delete the last column'); return }
+  const col=colById(id);
+  const cnt=data.tasks.filter(t=>t.status===id).length;
+  const msg=cnt?`Delete "${col?.name}" and move ${cnt} task(s) to the next column?`:`Delete column "${col?.name}"?`;
+  if(!confirm(msg)) return;
+  await fetch(`${API}/columns/${id}`,{method:'DELETE'});
+  await load(); toast('Column deleted');
+}
+
+
+function openNewColumnModal(){
+  document.getElementById('mc-name').value='';
+  selectedColColor=COLORS[0];
+  document.getElementById('col-color-row').innerHTML=COLORS.map(c=>
+    `<div class="color-swatch ${c===selectedColColor?'selected':''}" style="background:${c}" onclick="selectColColor('${c}',this)"></div>`).join('');
+  openModal('modal-col');
+}
+function selectColColor(c,el){ selectedColColor=c; document.querySelectorAll('#col-color-row .color-swatch').forEach(s=>s.classList.remove('selected')); el.classList.add('selected') }
+async function createColumn(){
+  const name=document.getElementById('mc-name').value.trim(); if(!name) return;
+  await fetch(`${API}/columns`,{method:'POST',body:JSON.stringify({name,color:selectedColColor}),headers:{'Content-Type':'application/json'}});
+  closeModal('modal-col'); await load(); toast('Column created');
+}
+
+// ── Schedule ───────────────────────────────────
+function renderSchedule(){
+  buildMpickDD('sc');
+  const now=new Date();
+  const tasks=data.tasks.filter(t=>t.dueDate).sort((a,b)=>new Date(a.dueDate)-new Date(b.dueDate));
+  const overdue=tasks.filter(t=>isOverdue(t));
+  const today=tasks.filter(t=>isToday(t)&&t.status!=='done');
+  const upcoming=tasks.filter(t=>!isOverdue(t)&&!isToday(t)&&t.status!=='done');
+  const done=tasks.filter(t=>t.status==='done');
+  function sec(label,cls,color,items){
+    if(!items.length) return '';
+    return `<div class="schedule-section"><div class="schedule-label" style="color:${color}">${label} (${items.length})</div>
+      ${items.map(t=>`<div class="schedule-item ${cls} ${t.status==='done'?'done':''}">
+        <input class="task-cb" type="checkbox" ${t.status==='done'?'checked':''} onchange="toggleTask('${t.id}')"/>
+        <span class="si-text">${esc(t.text)}</span>
+        ${taskProjects(t).map(p=>`<span class="proj-tag" style="background:${p.color}">${esc(p.name)}</span>`).join('')}
+        <span class="si-date ${cls}">${fmtDatetime(t.dueDate)}</span>
+        <button class="task-del" onclick="confirmDel('${t.id}')">×</button>
+      </div>`).join('')}</div>`;
+  }
+  const html=sec('⚠ Overdue','overdue','var(--red)',overdue)+sec('Today','today','var(--green)',today)+sec('Upcoming','upcoming','var(--muted)',upcoming)+sec('Completed','done','var(--muted)',done);
+  document.getElementById('schedule-list').innerHTML=html||`<div class="empty">No scheduled tasks. Add one above.</div>`;
+}
+
+async function addScheduledTask(){
+  const text=document.getElementById('sc-text').value.trim();
+  const due=document.getElementById('sc-due').value;
+  const pids=getMpickIds('sc');
+  if(!text||!due){ toast('Fill in task and date'); return }
+  await fetch(`${API}/tasks`,{method:'POST',body:JSON.stringify({text,dueDate:due,projectIds:pids,status:'todo'}),headers:{'Content-Type':'application/json'}});
+  document.getElementById('sc-text').value=''; document.getElementById('sc-due').value=''; clearMpick('sc');
+  await load(); toast('Scheduled');
+}
+document.getElementById('sc-text').addEventListener('keydown',e=>{ if(e.key==='Enter') addScheduledTask() });
+
+// ── Calendar ───────────────────────────────────
+function renderCalendar(){
+  buildMpickDD('cal');
+  const now=new Date();
+  const firstDay=new Date(calYear,calMonth,1);
+  const lastDay=new Date(calYear,calMonth+1,0);
+  document.getElementById('cal-title').textContent=firstDay.toLocaleDateString('en-US',{month:'long',year:'numeric'});
+  const taskMap={};
+  data.tasks.forEach(t=>{ if(!t.dueDate) return; const k=t.dueDate.slice(0,10); (taskMap[k]||(taskMap[k]=[])).push(t) });
+  const todayStr=now.toISOString().slice(0,10);
+  let html='';
+  const prevLast=new Date(calYear,calMonth,0).getDate();
+  for(let i=firstDay.getDay()-1;i>=0;i--) html+=`<div class="cal-cell other-month"><div class="cal-num">${prevLast-i}</div></div>`;
+  for(let d=1;d<=lastDay.getDate();d++){
+    const dateStr=`${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const tasks=taskMap[dateStr]||[];
+    const dots=tasks.slice(0,3).map(t=>{
+      const p=findProject((t.projectIds||[])[0]);
+      return `<div class="cal-dot ${t.status==='done'?'done':isOverdue(t)?'overdue':''}" style="background:${p?.color||'var(--accent)'}">${esc(t.text)}</div>`;
+    }).join('');
+    const more=tasks.length>3?`<div class="cal-more">+${tasks.length-3} more</div>`:'';
+    html+=`<div class="cal-cell ${dateStr===todayStr?'today':''} ${dateStr===calSelectedDate?'selected':''}" onclick="calSelectDay('${dateStr}')">
+      <div class="cal-num">${d}</div><div class="cal-dots">${dots}${more}</div></div>`;
+  }
+  const trailing=7-((firstDay.getDay()+lastDay.getDate())%7); if(trailing<7) for(let d=1;d<=trailing;d++) html+=`<div class="cal-cell other-month"><div class="cal-num">${d}</div></div>`;
+  document.getElementById('cal-days').innerHTML=html;
+}
+
+function calNav(dir){ calMonth+=dir; if(calMonth>11){calMonth=0;calYear++}else if(calMonth<0){calMonth=11;calYear--} renderCalendar() }
+function calGoToday(){ const n=new Date(); calYear=n.getFullYear(); calMonth=n.getMonth(); renderCalendar(); calSelectDay(n.toISOString().slice(0,10)) }
+
+function calSelectDay(dateStr){
+  calSelectedDate=dateStr; renderCalendar();
+  const dt=new Date(dateStr+'T00:00:00');
+  document.getElementById('cal-panel-title').textContent=dt.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
+  document.getElementById('cal-add-row').style.display='flex';
+  buildMpickDD('cal');
+  const tasks=data.tasks.filter(t=>t.dueDate&&t.dueDate.slice(0,10)===dateStr);
+  document.getElementById('cal-panel-tasks').innerHTML=tasks.length?tasks.map(t=>`
+    <div class="cal-task ${t.status==='done'?'done':''}">
+      <input class="task-cb" type="checkbox" ${t.status==='done'?'checked':''} onchange="toggleTask('${t.id}').then(()=>calSelectDay('${dateStr}'))"/>
+      <span class="cal-task-text">${esc(t.text)}</span>
+      ${taskProjects(t).map(p=>`<span class="proj-tag" style="background:${p.color};font-size:10px;padding:1px 6px">${esc(p.name)}</span>`).join('')}
+      <button class="task-del" onclick="delTask('${t.id}').then(()=>calSelectDay('${dateStr}'))">×</button>
+    </div>`).join(''):`<div class="empty" style="padding:16px 0">No tasks this day.</div>`;
+}
+
+async function addCalTask(){
+  const text=document.getElementById('cal-task-text').value.trim();
+  const pids=getMpickIds('cal');
+  if(!text||!calSelectedDate) return;
+  await fetch(`${API}/tasks`,{method:'POST',body:JSON.stringify({text,dueDate:calSelectedDate,projectIds:pids,status:'todo'}),headers:{'Content-Type':'application/json'}});
+  document.getElementById('cal-task-text').value=''; clearMpick('cal');
+  await load(); calSelectDay(calSelectedDate); toast('Task added');
+}
+document.getElementById('cal-task-text').addEventListener('keydown',e=>{ if(e.key==='Enter') addCalTask() });
+
+// ── Projects ───────────────────────────────────
+function renderProjects(){
+  document.getElementById('projects-grid').innerHTML=data.projects.map(p=>{
+    const tasks=data.tasks.filter(t=>(t.projectIds||[]).includes(p.id));
+    const done=tasks.filter(t=>t.status==='done').length;
+    const pct=tasks.length?Math.round(done/tasks.length*100):0;
+    return `<div class="proj-card" onclick="openProject('${p.id}')">
+      <div class="proj-card-header"><span class="proj-dot" style="background:${p.color}"></span><span class="proj-card-title">${esc(p.name)}</span></div>
+      <div class="proj-card-bar"><div class="proj-card-fill" style="width:${pct}%;background:${p.color}"></div></div>
+      <div class="proj-card-body"><div class="proj-card-stats">
+        <span class="proj-stat"><strong>${tasks.length}</strong> tasks</span>
+        <span class="proj-stat"><strong>${done}</strong> done</span>
+        <span class="proj-stat"><strong>${pct}%</strong></span>
+      </div></div>
+    </div>`;
+  }).join('')+`<div class="new-proj-card" onclick="openNewProjectModal()"><span style="font-size:24px">＋</span>New Project</div>`;
+}
+
+function openProject(id){ pdProjectId=id; pdFilter='all'; switchView('project-detail',null) }
+
+function renderProjectDetail(){
+  const p=findProject(pdProjectId); if(!p) return;
+  document.getElementById('pd-title').textContent=p.name;
+  document.getElementById('pd-dot').style.background=p.color;
+  let tasks=data.tasks.filter(t=>(t.projectIds||[]).includes(pdProjectId));
+  if(pdFilter==='todo') tasks=tasks.filter(t=>t.status==='todo');
+  else if(pdFilter==='inprogress') tasks=tasks.filter(t=>t.status!=='todo'&&t.status!=='done');
+  else if(pdFilter==='done') tasks=tasks.filter(t=>t.status==='done');
+  document.getElementById('pd-task-list').innerHTML=tasks.length?tasks.map(taskItemHTML).join(''):`<div class="empty">No tasks.</div>`;
+}
+
+function setPdFilter(f,btn){ pdFilter=f; document.querySelectorAll('#view-project-detail .chip').forEach(c=>c.classList.remove('active')); btn.classList.add('active'); renderProjectDetail() }
+
+async function addTaskToProject(){
+  const text=document.getElementById('pd-text').value.trim();
+  const due=document.getElementById('pd-due').value;
+  if(!text||!pdProjectId) return;
+  await fetch(`${API}/tasks`,{method:'POST',body:JSON.stringify({text,dueDate:due||null,projectIds:[pdProjectId],status:'todo'}),headers:{'Content-Type':'application/json'}});
+  document.getElementById('pd-text').value=''; document.getElementById('pd-due').value='';
+  await load(); toast('Task added');
+}
+document.getElementById('pd-text').addEventListener('keydown',e=>{ if(e.key==='Enter') addTaskToProject() });
+
+async function deleteCurrentProject(){
+  if(!confirm('Delete this project? Tasks will remain but lose this project tag.')) return;
+  await fetch(`${API}/projects/${pdProjectId}`,{method:'DELETE'});
+  await load(); switchView('projects',null); toast('Project deleted');
+}
+
+// ── New Project Modal ──────────────────────────
+
+function openNewProjectModal(){
+  document.getElementById('mp-name').value=''; selectedColor=COLORS[0];
+  document.getElementById('color-row').innerHTML=COLORS.map(c=>`<div class="color-swatch ${c===selectedColor?'selected':''}" style="background:${c}" onclick="selectColor('${c}',this)"></div>`).join('');
+  openModal('modal-proj');
+}
+function selectColor(c,el){ selectedColor=c; document.querySelectorAll('#color-row .color-swatch').forEach(s=>s.classList.remove('selected')); el.classList.add('selected') }
+async function createProject(){
+  const name=document.getElementById('mp-name').value.trim(); if(!name) return;
+  await fetch(`${API}/projects`,{method:'POST',body:JSON.stringify({name,color:selectedColor}),headers:{'Content-Type':'application/json'}});
+  closeModal('modal-proj'); await load(); toast('Project created');
+}
+
+// ── Summary ────────────────────────────────────
+function renderSummary(){
+  const done=data.tasks.filter(t=>isCompleted(t)).length;
+  const firstColId=data.columns[0]?.id;
+  const inprog=data.tasks.filter(t=>!isCompleted(t)&&t.status!==firstColId).length;
+  const overdue=data.tasks.filter(t=>isOverdue(t)).length;
+  document.getElementById('sm-total').textContent=data.tasks.length;
+  document.getElementById('sm-done').textContent=done;
+  document.getElementById('sm-inprog').textContent=inprog;
+  document.getElementById('sm-overdue').textContent=overdue;
+  document.getElementById('sm-proj-list').innerHTML=data.projects.map(p=>{
+    const tasks=data.tasks.filter(t=>(t.projectIds||[]).includes(p.id));
+    const dn=tasks.filter(t=>isCompleted(t)).length;
+    const pct=tasks.length?Math.round(dn/tasks.length*100):0;
+    return `<div class="sum-proj"><h4><span class="proj-dot" style="background:${p.color}"></span>${esc(p.name)}</h4>
+      <div class="sum-proj-bar"><div class="sum-proj-fill" style="width:${pct}%;background:${p.color}"></div></div>
+      <div style="font-size:12px;color:var(--muted)">${dn}/${tasks.length} done · ${pct}%</div></div>`;
+  }).join('');
+}
+
+// ── Calendar Connections ───────────────────────
+let acColor = COLORS[0];
+
+async function renderCalConnections(){
+  const r = await fetch(`${API}/calendars`);
+  const conns = await r.json();
+  const el = document.getElementById('cal-conn-list');
+  el.innerHTML = conns.map(c=>{
+    const statusIcon = c.status==='ok'?'✓':c.status==='error'?'✗':'…';
+    const statusCls  = c.status==='ok'?'ok':c.status==='error'?'error':'pending';
+    const lastSync   = c.lastSynced?`synced ${c.lastSynced.slice(11,16)}`:'never synced';
+    return `<div class="cal-conn-item" title="${esc(c.url||'')}">
+      <span class="cal-conn-dot" style="background:${c.color||'var(--accent2)'}"></span>
+      <div style="flex:1;min-width:0">
+        <div class="cal-conn-name">${esc(c.name||'Calendar')}</div>
+        <div style="font-size:10px;color:var(--muted)">${lastSync}${c.lastCount?' · '+c.lastCount+' events':''}</div>
+      </div>
+      <span class="cal-conn-status ${statusCls}" title="${esc(c.lastError||statusIcon)}">${statusIcon}</span>
+      <button class="cal-conn-sync" onclick="syncCalendar('${c.id}')" title="Sync now">↺</button>
+      <button class="cal-conn-del"  onclick="deleteCalendar('${c.id}')" title="Remove">×</button>
+    </div>`;
+  }).join('') || '';
+
+  // Badge in section header
+  const syncing = conns.filter(c=>c.status==='pending').length;
+  const badge = document.getElementById('cal-sync-badge');
+  if(badge) badge.textContent = conns.length ? (syncing?'syncing…':conns.length+' connected') : '';
+}
+
+function openAddCalendarModal(){
+  document.getElementById('ac-name').value='';
+  document.getElementById('ac-url').value='';
+  acColor=COLORS[0];
+  document.getElementById('ac-color-row').innerHTML=COLORS.map(c=>
+    `<div class="color-swatch ${c===acColor?'selected':''}" style="background:${c}" onclick="acColor='${c}';document.querySelectorAll('#ac-color-row .color-swatch').forEach(s=>s.classList.remove('selected'));this.classList.add('selected')"></div>`).join('');
+  const sel=document.getElementById('ac-project');
+  sel.innerHTML='<option value="">No project</option>'+data.projects.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('');
+  openModal('modal-add-cal');
+}
+
+async function addCalendarConnection(){
+  const name=document.getElementById('ac-name').value.trim();
+  const url=document.getElementById('ac-url').value.trim();
+  const projId=document.getElementById('ac-project').value;
+  if(!name||!url){ toast('Name and URL are required'); return; }
+  if(!url.includes('.ics')&&!url.includes('ical')&&!url.includes('webcal')){
+    if(!confirm('URL does not look like an iCal link. Continue anyway?')) return;
+  }
+  await fetch(`${API}/calendars`,{method:'POST',body:JSON.stringify({name,url:url.replace('webcal://','https://'),color:acColor,projectId:projId||null}),headers:{'Content-Type':'application/json'}});
+  closeModal('modal-add-cal');
+  await load();
+  await renderCalConnections();
+  toast('Calendar connected — syncing now…');
+  // Poll for sync completion
+  setTimeout(async()=>{ await load(); await renderCalConnections(); },4000);
+}
+
+async function syncCalendar(id){
+  toast('Syncing…');
+  await fetch(`${API}/calendars/${id}/sync`,{method:'POST'});
+  await load();
+  await renderCalConnections();
+  toast('Sync complete');
+}
+
+async function deleteCalendar(id){
+  if(!confirm('Remove this calendar? All imported events will be deleted.')) return;
+  await fetch(`${API}/calendars/${id}`,{method:'DELETE'});
+  await load();
+  await renderCalConnections();
+  toast('Calendar removed');
+}
+
+// ── Subtasks ──────────────────────────────────
+function toggleSubtaskList(id){ const el=document.getElementById('sl-'+id); if(el) el.style.display=el.style.display==='none'?'flex':'none'; }
+async function toggleSubtask(taskId, idx){
+  const t=findTask(taskId); if(!t) return;
+  const subs=[...(t.subtasks||[])];
+  subs[idx]={...subs[idx],done:!subs[idx].done};
+  await patchTask(taskId,{subtasks:subs});
+}
+let modalSubtasks=[];
+function renderModalSubtasks(){
+  document.getElementById('mt-subtask-list').innerHTML=modalSubtasks.map((s,i)=>`
+    <div class="subtask-row">
+      <input type="checkbox" ${s.done?'checked':''} onchange="modalSubtasks[${i}].done=this.checked"/>
+      <input type="text" value="${esc(s.text)}" oninput="modalSubtasks[${i}].text=this.value" placeholder="Subtask…"/>
+      <button onclick="modalSubtasks.splice(${i},1);renderModalSubtasks()">×</button>
+    </div>`).join('');
+}
+function addSubtaskInModal(){
+  const inp=document.getElementById('mt-subtask-input');
+  const text=inp.value.trim(); if(!text) return;
+  modalSubtasks.push({id:crypto.randomUUID(),text,done:false});
+  inp.value=''; renderModalSubtasks();
+}
+document.addEventListener('keydown',e=>{ if(e.key==='Enter'&&document.activeElement===document.getElementById('mt-subtask-input')) addSubtaskInModal(); });
+
+// ── Today view ─────────────────────────────────
+function renderToday(){
+  buildMpickDD('td');
+  const now=new Date();
+  const todayStr=now.toISOString().slice(0,10);
+  document.getElementById('today-date').textContent=now.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
+  const overdue=data.tasks.filter(t=>isOverdue(t));
+  const todayTasks=data.tasks.filter(t=>t.dueDate&&t.dueDate.slice(0,10)===todayStr&&!isOverdue(t));
+  const inProg=data.tasks.filter(t=>!isCompleted(t)&&t.status!==data.columns[0]?.id&&!t.dueDate);
+  const todayDone=data.tasks.filter(t=>isCompleted(t)&&t.dueDate&&t.dueDate.slice(0,10)===todayStr);
+  document.getElementById('today-subtitle').textContent=
+    `${overdue.length} overdue · ${todayTasks.length} due today · ${inProg.length} in progress`;
+  function section(label,color,tasks){
+    if(!tasks.length) return '';
+    return `<div class="today-section">
+      <div class="today-section-label" style="color:${color}">${label} (${tasks.length})</div>
+      <div class="task-list">${tasks.map(taskItemHTML).join('')}</div>
+    </div>`;
+  }
+  document.getElementById('today-content').innerHTML=
+    section('⚠ Overdue','var(--red)',overdue)+
+    section('Due Today','var(--green)',todayTasks)+
+    section('In Progress','var(--accent)',inProg)+
+    section('Completed Today','var(--muted)',todayDone)||
+    `<div class="empty">Nothing due today 🎉</div>`;
+}
+async function addTodayTask(){
+  const text=document.getElementById('td-text').value.trim(); if(!text) return;
+  const pids=getMpickIds('td');
+  const today=new Date().toISOString().slice(0,10);
+  await fetch(`${API}/tasks`,{method:'POST',body:JSON.stringify({text,dueDate:today,projectIds:pids,status:data.columns[0]?.id||'todo'}),headers:{'Content-Type':'application/json'}});
+  document.getElementById('td-text').value=''; clearMpick('td');
+  await load(); toast('Task added for today');
+}
+document.addEventListener('DOMContentLoaded',()=>{
+  const inp=document.getElementById('td-text');
+  if(inp) inp.addEventListener('keydown',e=>{ if(e.key==='Enter') addTodayTask(); });
+});
+
+// ── Weekly view ────────────────────────────────
+let weekOffset=0;
+function weekStart(offset=0){
+  const d=new Date(); d.setHours(0,0,0,0);
+  const day=d.getDay(); // 0=Sun
+  d.setDate(d.getDate()-day+1+(offset*7)); // start on Monday
+  return d;
+}
+function weekNav(dir){ weekOffset+=dir; renderWeek(); }
+function weekGoToday(){ weekOffset=0; renderWeek(); }
+function renderWeek(){
+  const mon=weekStart(weekOffset);
+  const sun=new Date(mon); sun.setDate(sun.getDate()+6);
+  document.getElementById('week-title').textContent=
+    mon.toLocaleDateString('en-US',{month:'short',day:'numeric'})+' – '+
+    sun.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+  const todayStr=new Date().toISOString().slice(0,10);
+  const taskMap={};
+  data.tasks.forEach(t=>{ if(!t.dueDate) return; const k=t.dueDate.slice(0,10); (taskMap[k]||(taskMap[k]=[])).push(t); });
+  const days=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  document.getElementById('week-grid').innerHTML=days.map((dayName,i)=>{
+    const d=new Date(mon); d.setDate(d.getDate()+i);
+    const dateStr=d.toISOString().slice(0,10);
+    const tasks=taskMap[dateStr]||[];
+    const isToday=dateStr===todayStr;
+    return `<div class="week-col ${isToday?'is-today':''}">
+      <div class="week-col-header">
+        <div class="week-col-day">${dayName}</div>
+        <div class="week-col-date">${d.getDate()}</div>
+      </div>
+      <div class="week-col-tasks">
+        ${tasks.length?tasks.map(t=>{
+          const projs=taskProjects(t);
+          const projColor=projs[0]?.color||'var(--accent)';
+          return `<div class="week-task ${isCompleted(t)?'done-wt':isOverdue(t)?'overdue-wt':''}"
+            style="border-left-color:${projColor}" onclick="openEditTask('${t.id}')">
+            ${esc(t.text)}
+            <div class="wt-proj">${projs.map(p=>esc(p.name)).join(', ')||'No project'}</div>
+          </div>`;
+        }).join(''):
+        `<div class="week-empty">—</div>`}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── ICS Import ─────────────────────────────────
+let importedEvents=[];
+function openImportModal(){ importedEvents=[]; document.getElementById('import-preview-wrap').style.display='none'; document.getElementById('import-btn').style.display='none'; buildMpickDD('imp'); openModal('modal-import'); }
+function importDragOver(e){ e.preventDefault(); document.getElementById('import-zone').classList.add('dragover'); }
+function importDragLeave(e){ document.getElementById('import-zone').classList.remove('dragover'); }
+function importDrop(e){ e.preventDefault(); document.getElementById('import-zone').classList.remove('dragover'); const f=e.dataTransfer.files[0]; if(f) readICSFile(f); }
+function importFileChosen(e){ const f=e.target.files[0]; if(f) readICSFile(f); }
+function readICSFile(file){ const r=new FileReader(); r.onload=e=>parseAndPreviewICS(e.target.result); r.readAsText(file); }
+
+function parseAndPreviewICS(text){
+  importedEvents=[];
+  const events=text.split('BEGIN:VEVENT');
+  for(let i=1;i<events.length;i++){
+    const block=events[i];
+    const get=(key)=>{ const m=block.match(new RegExp(key+'[^:]*:([^\r\n]+)')); return m?m[1].trim():null; };
+    const summary=get('SUMMARY')||'Untitled Event';
+    const desc=get('DESCRIPTION');
+    const dtstart=get('DTSTART')||get('DTSTART;VALUE=DATE')||get('DTSTART;TZID=[^:]+');
+    if(!dtstart) continue;
+    // Parse ICS date: 20260613T100000Z or 20260613
+    let dueDate=null;
+    const dm=dtstart.replace(/[^\d]/g,'');
+    if(dm.length>=8){
+      const y=dm.slice(0,4),mo=dm.slice(4,6),d=dm.slice(6,8);
+      dueDate=`${y}-${mo}-${d}`;
+      if(dm.length>=12){ dueDate+=`T${dm.slice(8,10)}:${dm.slice(10,12)}`; }
+    }
+    importedEvents.push({summary,description:desc,dueDate,selected:true});
+  }
+  document.getElementById('import-count').textContent=`${importedEvents.length} events found`;
+  document.getElementById('import-preview').innerHTML=importedEvents.map((ev,i)=>`
+    <div class="import-event">
+      <input type="checkbox" checked onchange="importedEvents[${i}].selected=this.checked"/>
+      <div class="import-event-body">
+        <div class="import-event-title">${esc(ev.summary)}</div>
+        <div class="import-event-date">${ev.dueDate?fmtDate(ev.dueDate):'No date'}</div>
+      </div>
+    </div>`).join('');
+  document.getElementById('import-preview-wrap').style.display='block';
+  document.getElementById('import-btn').style.display='block';
+}
+function importSelectAll(val){ importedEvents.forEach((_,i)=>{ importedEvents[i].selected=val; document.querySelectorAll('#import-preview input[type=checkbox]')[i].checked=val; }); }
+async function doImport(){
+  const pids=getMpickIds('imp');
+  const firstCol=data.columns[0]?.id||'todo';
+  const toImport=importedEvents.filter(e=>e.selected);
+  for(const ev of toImport){
+    await fetch(`${API}/tasks`,{method:'POST',body:JSON.stringify({text:ev.summary,notes:ev.description||null,dueDate:ev.dueDate||null,projectIds:pids,status:firstCol}),headers:{'Content-Type':'application/json'}});
+  }
+  closeModal('modal-import');
+  await load();
+  toast(`Imported ${toImport.length} events`);
+}
+
+// ── Search ─────────────────────────────────────
+function onSearch(q){
+  q=q.trim();
+  document.getElementById('search-clear').classList.toggle('visible',q.length>0);
+  clearTimeout(searchTimeout);
+  if(!q){ clearSearch(); return }
+  searchTimeout=setTimeout(()=>runSearch(q),150);
+}
+function runSearch(q){
+  const lower=q.toLowerCase();
+  const active=document.querySelector('.view.active');
+  if(active&&active.id!=='view-search') lastView=active.id.replace('view-','');
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.getElementById('view-search').classList.add('active');
+  function hl(str){ const i=str.toLowerCase().indexOf(lower); if(i===-1) return esc(str); return esc(str.slice(0,i))+'<mark>'+esc(str.slice(i,i+q.length))+'</mark>'+esc(str.slice(i+q.length)) }
+  const taskHits=data.tasks.filter(t=>t.text.toLowerCase().includes(lower)||(t.tags||[]).some(tg=>tg.toLowerCase().includes(lower)));
+  const projHits=data.projects.filter(p=>p.name.toLowerCase().includes(lower));
+  let html='';
+  if(projHits.length) html+=`<div class="search-section-label" style="margin-top:4px">Projects (${projHits.length})</div>`+projHits.map(p=>`<div class="search-hit" onclick="openProject('${p.id}');clearSearch()"><span class="proj-dot" style="background:${p.color};width:10px;height:10px"></span><span class="hit-text">${hl(p.name)}</span><span style="font-size:11px;color:var(--muted)">${data.tasks.filter(t=>(t.projectIds||[]).includes(p.id)).length} tasks</span></div>`).join('');
+  if(taskHits.length) html+=`<div class="search-section-label" style="margin-top:${projHits.length?14:4}px">Tasks (${taskHits.length})</div>`+taskHits.map(t=>`<div class="search-hit" onclick="openEditTask('${t.id}')"><input class="task-cb" type="checkbox" ${t.status==='done'?'checked':''} onclick="event.stopPropagation();toggleTask('${t.id}')"/><span class="hit-text" style="${t.status==='done'?'text-decoration:line-through;opacity:.5':''}">${hl(t.text)}</span>${taskProjects(t).map(p=>`<span class="proj-tag" style="background:${p.color}">${esc(p.name)}</span>`).join('')}${t.dueDate?`<span class="due-tag ${isOverdue(t)?'overdue':isToday(t)?'today':''}">${fmtDate(t.dueDate)}</span>`:''}</div>`).join('');
+  if(!taskHits.length&&!projHits.length) html=`<div class="search-empty">No results for "<strong>${esc(q)}</strong>"</div>`;
+  document.getElementById('search-results').innerHTML=html;
+}
+function clearSearch(){ document.getElementById('global-search').value=''; document.getElementById('search-clear').classList.remove('visible'); document.querySelectorAll('.view').forEach(v=>v.classList.remove('active')); document.getElementById('view-'+lastView).classList.add('active') }
+
+// ── Close modals on backdrop click ────────────
+document.querySelectorAll('.modal-overlay').forEach(o=>o.addEventListener('click',e=>{ if(e.target===o) o.classList.remove('open') }));
+
+// ── Boot ──────────────────────────────────────
+load().then(() => renderCalConnections());
+</script>
+</body>
+</html>
