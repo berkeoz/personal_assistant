@@ -5,3 +5,6 @@ TaskManager/tasks.json
 TaskManager/backups/
 *.user
 .vs/
+node_modules/
+dev-server.out.log
+dev-server.err.log
