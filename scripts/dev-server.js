@@ -38,32 +38,15 @@ await new Promise((resolve) => kvServer.listen(0, "127.0.0.1", resolve));
 process.env.KV_REST_API_URL = `http://127.0.0.1:${kvServer.address().port}`;
 process.env.KV_REST_API_TOKEN = "dev-token";
 
-// ---- Route table matching this repo's /api file layout ----
-const routes = [
-  { pattern: /^\/api\/data$/, mod: "../api/data.js" },
-  { pattern: /^\/api\/tasks$/, mod: "../api/tasks/index.js" },
-  { pattern: /^\/api\/tasks\/([^/]+)$/, mod: "../api/tasks/[id].js", params: ["id"] },
-  { pattern: /^\/api\/columns$/, mod: "../api/columns/index.js" },
-  { pattern: /^\/api\/columns\/([^/]+)$/, mod: "../api/columns/[id].js", params: ["id"] },
-  { pattern: /^\/api\/projects$/, mod: "../api/projects/index.js" },
-  { pattern: /^\/api\/projects\/([^/]+)$/, mod: "../api/projects/[id].js", params: ["id"] },
-  { pattern: /^\/api\/calendars$/, mod: "../api/calendars/index.js" },
-  { pattern: /^\/api\/calendars\/([^/]+)\/sync$/, mod: "../api/calendars/[id]/sync.js", params: ["id"] },
-  { pattern: /^\/api\/calendars\/([^/]+)$/, mod: "../api/calendars/[id].js", params: ["id"] },
-  { pattern: /^\/api\/mindmaps$/, mod: "../api/mindmaps/index.js" },
-  { pattern: /^\/api\/mindmaps\/([^/]+)$/, mod: "../api/mindmaps/[id].js", params: ["id"] },
-  { pattern: /^\/api\/habits$/, mod: "../api/habits/index.js" },
-  { pattern: /^\/api\/habits\/([^/]+)\/toggle$/, mod: "../api/habits/[id]/toggle.js", params: ["id"] },
-  { pattern: /^\/api\/habits\/([^/]+)$/, mod: "../api/habits/[id].js", params: ["id"] },
-];
-
-const moduleCache = new Map();
-async function loadHandler(mod) {
-  if (!moduleCache.has(mod)) {
-    const m = await import(new URL(mod, import.meta.url));
-    moduleCache.set(mod, m.default);
+// ---- Single catch-all handler, mirroring api/[...all].js on Vercel ----
+const ALL_HANDLER_MOD = "../api/[...all].js";
+let allHandler = null;
+async function loadHandler() {
+  if (!allHandler) {
+    const m = await import(new URL(ALL_HANDLER_MOD, import.meta.url));
+    allHandler = m.default;
   }
-  return moduleCache.get(mod);
+  return allHandler;
 }
 
 function readBody(req) {
@@ -78,35 +61,34 @@ const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, "http://localhost");
 
   if (url.pathname.startsWith("/api/")) {
-    for (const route of routes) {
-      const m = url.pathname.match(route.pattern);
-      if (!m) continue;
-      const query = Object.fromEntries(url.searchParams);
-      (route.params || []).forEach((p, i) => (query[p] = m[i + 1]));
-      req.query = query;
-      const raw = await readBody(req);
-      if (raw) {
-        try {
-          req.body = JSON.parse(raw);
-        } catch {
-          req.body = raw;
-        }
-      }
-      res.status = (code) => { res.statusCode = code; return res; };
-      res.json = (obj) => { res.setHeader("Content-Type", "application/json"); res.end(JSON.stringify(obj)); };
-      res.send = (val) => res.end(typeof val === "string" ? val : JSON.stringify(val));
-      try {
-        const handler = await loadHandler(route.mod);
-        await handler(req, res);
-      } catch (e) {
-        console.error(e);
-        res.statusCode = 500;
-        res.end(String(e));
-      }
-      return;
+    const all = url.pathname.slice("/api/".length).split("/").filter(Boolean);
+    if (all.length === 0) {
+      res.statusCode = 404;
+      return res.end("Not found");
     }
-    res.statusCode = 404;
-    return res.end("Not found");
+    const query = Object.fromEntries(url.searchParams);
+    query.all = all;
+    req.query = query;
+    const raw = await readBody(req);
+    if (raw) {
+      try {
+        req.body = JSON.parse(raw);
+      } catch {
+        req.body = raw;
+      }
+    }
+    res.status = (code) => { res.statusCode = code; return res; };
+    res.json = (obj) => { res.setHeader("Content-Type", "application/json"); res.end(JSON.stringify(obj)); };
+    res.send = (val) => res.end(typeof val === "string" ? val : JSON.stringify(val));
+    try {
+      const handler = await loadHandler();
+      await handler(req, res);
+    } catch (e) {
+      console.error(e);
+      res.statusCode = 500;
+      res.end(String(e));
+    }
+    return;
   }
 
   const html = await readFile(path.join(ROOT, "index.html"));
