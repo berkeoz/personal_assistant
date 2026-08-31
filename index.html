@@ -237,7 +237,57 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
   .task-meta{flex-basis:100%;margin-left:26px}
   .schedule-item{flex-wrap:wrap}
   .si-date{flex-basis:100%;text-align:left;margin-top:2px}
+  .mm-canvas-wrap{height:55vh}
+  .hb-cell{width:18px;height:18px}
 }
+
+/* Mind Map */
+.mm-toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.mm-select{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-size:13px;outline:none;max-width:200px}
+.mm-canvas-wrap{position:relative;overflow:auto;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);height:70vh;background-image:radial-gradient(var(--border) 1px,transparent 1px);background-size:22px 22px}
+.mm-canvas{position:relative;width:2400px;height:1600px}
+.mm-svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
+.mm-edge{stroke:var(--muted);stroke-width:2;fill:none;pointer-events:none}
+.mm-edge.selected{stroke:var(--accent);stroke-width:3}
+.mm-edge-hit{stroke:transparent;stroke-width:14;fill:none;cursor:pointer;pointer-events:stroke}
+.mm-node{position:absolute;display:flex;align-items:center;justify-content:center;padding:10px 14px;color:#fff;font-size:13px;font-weight:600;text-align:center;cursor:grab;border:2px solid transparent;user-select:none;box-shadow:0 2px 10px #0005;word-break:break-word;overflow:hidden}
+.mm-node.dragging{cursor:grabbing;opacity:.85;z-index:20}
+.mm-node.selected{border-color:#fff}
+.mm-node[data-shape="circle"]{border-radius:50%}
+.mm-node[data-shape="rect"]{border-radius:10px}
+.mm-node-text{outline:none;width:100%;pointer-events:none}
+.mm-node-text[contenteditable="true"]{pointer-events:auto;cursor:text}
+.mm-handle{position:absolute;top:50%;right:-11px;transform:translateY(-50%);width:20px;height:20px;background:var(--accent);border:2px solid var(--surface);border-radius:50%;cursor:crosshair;z-index:5;opacity:.55;transition:opacity .15s}
+.mm-resize-handle{position:absolute;right:-9px;bottom:-9px;width:18px;height:18px;background:var(--surface2);border:2px solid var(--accent);border-radius:5px;cursor:nwse-resize;z-index:5;opacity:.55;transition:opacity .15s}
+.mm-node:hover .mm-handle,.mm-node:hover .mm-resize-handle,.mm-node.selected .mm-handle,.mm-node.selected .mm-resize-handle{opacity:1}
+.mm-empty-hint{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:var(--muted);font-size:13px;text-align:center;pointer-events:none;width:80%}
+
+/* Habits */
+.hb-toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.hb-grid-wrap{overflow-x:auto}
+.hb-grid{border-collapse:separate;border-spacing:4px;font-size:12px}
+.hb-grid th{color:var(--muted);font-weight:500;font-size:10px;padding:2px 4px;line-height:1.3}
+.hb-row-name{text-align:left!important;white-space:nowrap;padding-right:10px!important;font-size:13px;font-weight:500;cursor:pointer;color:var(--text)}
+.hb-row-name:hover{color:var(--accent)}
+.hb-cell{width:22px;height:22px;border-radius:5px;cursor:pointer;background:var(--surface2);border:1px solid var(--border);transition:transform .1s}
+.hb-cell:hover{transform:scale(1.15)}
+.hb-cell.done{border-color:transparent}
+.hb-cell.unscheduled{opacity:.3;cursor:default}
+.hb-cell.unscheduled:hover{transform:none}
+.hb-status{font-size:10px;padding:2px 7px;border-radius:10px;white-space:nowrap}
+.hb-status.on{background:#1a3028;color:var(--green)}
+.hb-status.off{background:#3d1515;color:var(--red)}
+.hb-status.new{background:var(--surface3);color:var(--muted)}
+.hb-detail-header{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.hb-stat-row{display:flex;gap:16px;flex-wrap:wrap}
+.hb-stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px;min-width:100px}
+.hb-stat .lbl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px}
+.hb-stat .val{font-size:20px;font-weight:700}
+.cal-cell.hb-done{background:#1a3028}
+.cal-cell.hb-missed{background:#3d1515}
+.weekday-picker{display:flex;gap:6px}
+.weekday-chip{width:34px;height:34px;border-radius:50%;border:1px solid var(--border);background:var(--surface2);color:var(--muted);cursor:pointer;font-size:11px;display:flex;align-items:center;justify-content:center;transition:all .15s;user-select:none}
+.weekday-chip.selected{background:var(--accent);border-color:var(--accent);color:#fff}
 
 /* Modal */
 .modal-overlay{position:fixed;inset:0;background:#0009;display:none;align-items:center;justify-content:center;z-index:100}
@@ -358,6 +408,8 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
   <button class="nav-btn" onclick="switchView('schedule',this)" data-view="schedule"><span class="ic">📅</span> Schedule</button>
   <button class="nav-btn" onclick="switchView('calendar',this)" data-view="calendar"><span class="ic">🗓</span> Calendar</button>
   <button class="nav-btn" onclick="switchView('summary',this)" data-view="summary"><span class="ic">📊</span> Summary</button>
+  <button class="nav-btn" onclick="switchView('mindmap',this)" data-view="mindmap"><span class="ic">🧠</span> Mind Map</button>
+  <button class="nav-btn" onclick="switchView('habits',this)" data-view="habits"><span class="ic">🔁</span> Habits</button>
   <button class="nav-btn" onclick="openImportModal()" style="color:var(--accent2)"><span class="ic">📥</span> Import .ics</button>
   <div class="nav-section">Calendar Sync <span id="cal-sync-badge" style="margin-left:auto;font-size:10px;color:var(--green)"></span></div>
   <div id="cal-conn-list"></div>
@@ -527,6 +579,67 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
     <div id="search-results"></div>
   </div>
 
+  <!-- Mind Map -->
+  <div class="view" id="view-mindmap">
+    <div class="mm-toolbar">
+      <select class="mm-select" id="mm-select" onchange="selectMindMap(this.value)"></select>
+      <button class="btn btn-ghost btn-sm" onclick="openNewMindMapModal()">＋ New Map</button>
+      <button class="btn btn-ghost btn-sm" id="mm-rename-btn" onclick="renameMindMap()">Rename</button>
+      <button class="btn btn-danger btn-sm" id="mm-delete-btn" onclick="deleteMindMap()">Delete Map</button>
+      <span style="flex:1"></span>
+      <button class="btn btn-ghost btn-sm" onclick="addMmNode('circle')">◯ Circle</button>
+      <button class="btn btn-ghost btn-sm" onclick="addMmNode('rect')">▭ Rectangle</button>
+      <button class="btn btn-danger btn-sm" id="mm-del-sel-btn" onclick="deleteMmSelection()" style="display:none">Delete Selected</button>
+    </div>
+    <div class="mm-canvas-wrap" id="mm-canvas-wrap">
+      <div class="mm-canvas" id="mm-canvas">
+        <svg class="mm-svg" id="mm-svg"></svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- Habits -->
+  <div class="view" id="view-habits">
+    <div id="habits-overview">
+      <div class="hb-toolbar">
+        <button class="btn btn-primary btn-sm" onclick="openNewHabitModal()">＋ New Habit</button>
+      </div>
+      <div class="hb-grid-wrap" id="hb-grid-wrap"></div>
+    </div>
+    <div id="habits-detail" style="display:none">
+      <button class="back-btn" onclick="closeHabitDetail()">← Back to Habits</button>
+      <div class="hb-detail-header">
+        <span id="hbd-dot" class="proj-dot" style="width:12px;height:12px"></span>
+        <h2 id="hbd-title" style="font-size:18px"></h2>
+        <span class="hb-status" id="hbd-status"></span>
+        <button class="btn btn-ghost btn-sm" onclick="openEditHabitModal()">Edit</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteHabit()">Delete</button>
+      </div>
+      <div class="hb-stat-row">
+        <div class="hb-stat"><div class="lbl">Current Streak</div><div class="val" id="hbd-streak">–</div></div>
+        <div class="hb-stat"><div class="lbl">Best Streak</div><div class="val" id="hbd-best">–</div></div>
+        <div class="hb-stat"><div class="lbl">This Month</div><div class="val" id="hbd-month">–</div></div>
+      </div>
+      <div class="cal-wrap">
+        <div class="cal-grid-wrap">
+          <div class="cal-header">
+            <button class="cal-nav" onclick="hbCalNav(-1)">‹</button>
+            <h3 id="hbd-cal-title"></h3>
+            <button class="cal-nav" onclick="hbCalNav(1)">›</button>
+            <button class="cal-today-btn" onclick="hbCalGoToday()">Today</button>
+          </div>
+          <div class="cal-day-names">
+            <div class="cal-day-name">Sun</div><div class="cal-day-name">Mon</div>
+            <div class="cal-day-name">Tue</div><div class="cal-day-name">Wed</div>
+            <div class="cal-day-name">Thu</div><div class="cal-day-name">Fri</div>
+            <div class="cal-day-name">Sat</div>
+          </div>
+          <div class="cal-days" id="hbd-cal-days"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </div>
 
 <!-- Modal: New Project -->
@@ -638,12 +751,47 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
   </div>
 </div>
 
+<!-- Modal: New Mind Map -->
+<div class="modal-overlay" id="modal-mindmap">
+  <div class="modal">
+    <h3>New Mind Map</h3>
+    <div class="field"><label>Name</label><input id="mm-name-input" placeholder="e.g. Startup Idea, Life Goals…"/></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modal-mindmap')">Cancel</button>
+      <button class="btn btn-primary" onclick="createMindMap()">Create</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: New/Edit Habit -->
+<div class="modal-overlay" id="modal-habit">
+  <div class="modal">
+    <h3 id="mh-title">New Habit</h3>
+    <div class="field"><label>Name</label><input id="mh-name" placeholder="e.g. Drink water, Read, Meditate…"/></div>
+    <div class="field"><label>Color</label><div class="color-row" id="mh-color-row"></div></div>
+    <div class="field"><label>Schedule</label>
+      <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="radio" name="mh-sched" value="daily" checked onchange="setHabitScheduleType('daily')"/> Every day</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="radio" name="mh-sched" value="weekly" onchange="setHabitScheduleType('weekly')"/> Specific days</label>
+      </div>
+    </div>
+    <div class="field" id="mh-weekday-field" style="display:none">
+      <label>Days</label>
+      <div class="weekday-picker" id="mh-weekday-picker"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modal-habit')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveHabitModal()">Save</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <script>
 const API = '/api';
 const COLORS = ['#6c8eff','#a78bfa','#34d399','#fbbf24','#f87171','#fb923c','#38bdf8','#f472b6','#94a3b8'];
-let data = { columns: [], projects: [], tasks: [] };
+let data = { columns: [], projects: [], tasks: [], mindmaps: [], habits: [] };
 let listFilter = 'all', kbProjFilter = null, pdFilter = 'all', pdProjectId = null;
 let hiddenCols = new Set();   // column IDs hidden in kanban
 let dragColId = null;         // column being dragged (for reorder)
@@ -654,6 +802,12 @@ let lastView = 'list';
 let searchTimeout = null;
 // multi-pick state per namespace
 const mpickState = {};
+// Mind map state
+let mmActiveId = null, mmSelectedNodeId = null, mmSelectedEdgeId = null;
+// Habit state
+let habitColor = COLORS[0], habitScheduleType = 'daily', habitScheduleDays = new Set([1,2,3,4,5]);
+let editingHabitId = null, activeHabitId = null;
+let hbCalYear = new Date().getFullYear(), hbCalMonth = new Date().getMonth();
 
 // ── Utilities ─────────────────────────────────
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') }
@@ -733,6 +887,8 @@ async function load(){
   if(!data.columns) data.columns=[];
   if(!data.projects) data.projects=[];
   if(!data.tasks) data.tasks=[];
+  if(!data.mindmaps) data.mindmaps=[];
+  if(!data.habits) data.habits=[];
   renderAll();
 }
 
@@ -781,6 +937,8 @@ function renderView(name){
   else if(name==='projects') renderProjects();
   else if(name==='project-detail') renderProjectDetail();
   else if(name==='summary') renderSummary();
+  else if(name==='mindmap') renderMindMap();
+  else if(name==='habits') renderHabits();
 }
 
 // ── Sidebar ────────────────────────────────────
@@ -1495,6 +1653,548 @@ function runSearch(q){
   document.getElementById('search-results').innerHTML=html;
 }
 function clearSearch(){ document.getElementById('global-search').value=''; document.getElementById('search-clear').classList.remove('visible'); document.querySelectorAll('.view').forEach(v=>v.classList.remove('active')); document.getElementById('view-'+lastView).classList.add('active') }
+
+// ── Mind Map ───────────────────────────────────
+function activeMindMap(){ return data.mindmaps.find(m=>m.id===mmActiveId) }
+
+function renderMindMap(){
+  const sel=document.getElementById('mm-select');
+  const wrap=document.getElementById('mm-canvas-wrap');
+  wrap.querySelector('.mm-empty-hint')?.remove();
+  if(!data.mindmaps.length){
+    sel.innerHTML='<option value="">No maps yet</option>';
+    document.getElementById('mm-rename-btn').style.display='none';
+    document.getElementById('mm-delete-btn').style.display='none';
+    document.getElementById('mm-canvas').querySelectorAll('.mm-node').forEach(n=>n.remove());
+    document.getElementById('mm-svg').innerHTML='';
+    const hint=document.createElement('div');
+    hint.className='mm-empty-hint';
+    hint.textContent='Create a mind map to get started — click "＋ New Map" above.';
+    wrap.appendChild(hint);
+    updateMmDeleteBtn();
+    return;
+  }
+  document.getElementById('mm-rename-btn').style.display='';
+  document.getElementById('mm-delete-btn').style.display='';
+  if(!mmActiveId || !data.mindmaps.find(m=>m.id===mmActiveId)) mmActiveId=data.mindmaps[0].id;
+  sel.innerHTML=data.mindmaps.map(m=>`<option value="${m.id}" ${m.id===mmActiveId?'selected':''}>${esc(m.name)}</option>`).join('');
+  renderMmCanvas();
+}
+
+function selectMindMap(id){ mmActiveId=id; mmSelectedNodeId=null; mmSelectedEdgeId=null; renderMmCanvas(); }
+
+function mmNodeCenter(n){ return { x:n.x+n.w/2, y:n.y+n.h/2 } }
+
+function renderMmCanvas(){
+  const map=activeMindMap();
+  const canvas=document.getElementById('mm-canvas');
+  const svg=document.getElementById('mm-svg');
+  canvas.querySelectorAll('.mm-node').forEach(n=>n.remove());
+  if(!map){ svg.innerHTML=''; updateMmDeleteBtn(); return }
+  svg.innerHTML=(map.edges||[]).map(e=>mmEdgeSvg(e)).join('');
+  (map.nodes||[]).forEach(n=>canvas.appendChild(mmNodeEl(n)));
+  updateMmDeleteBtn();
+}
+
+function mmEdgeSvg(e){
+  const map=activeMindMap();
+  const a=map.nodes.find(n=>n.id===e.from), b=map.nodes.find(n=>n.id===e.to);
+  if(!a||!b) return '';
+  const p1=mmNodeCenter(a), p2=mmNodeCenter(b);
+  return `<g data-edge-id="${e.id}">
+    <line class="mm-edge ${e.id===mmSelectedEdgeId?'selected':''}" x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}"/>
+    <line class="mm-edge-hit" x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}" onclick="selectMmEdge('${e.id}')"/>
+  </g>`;
+}
+
+function mmNodeEl(n){
+  const el=document.createElement('div');
+  el.className='mm-node'+(n.id===mmSelectedNodeId?' selected':'');
+  el.dataset.shape=n.shape; el.dataset.id=n.id;
+  el.style.left=n.x+'px'; el.style.top=n.y+'px'; el.style.width=n.w+'px'; el.style.height=n.h+'px';
+  el.style.background=n.color;
+
+  const txt=document.createElement('div');
+  txt.className='mm-node-text'; txt.spellcheck=false; txt.contentEditable='false';
+  txt.textContent=n.text;
+  txt.addEventListener('blur', ()=>{
+    txt.contentEditable='false';
+    const val=txt.textContent.trim()||'Untitled';
+    if(val!==n.text){ n.text=val; saveMindMap(); } else { txt.textContent=val; }
+  });
+  txt.addEventListener('keydown', e=>{
+    if(e.key==='Enter'){ e.preventDefault(); txt.blur(); }
+    if(e.key==='Escape'){ txt.textContent=n.text; txt.blur(); }
+  });
+  txt.addEventListener('mousedown', e=>{ if(txt.contentEditable==='true') e.stopPropagation(); });
+  el.appendChild(txt);
+
+  el.addEventListener('dblclick', e=>{
+    e.stopPropagation();
+    txt.contentEditable='true'; txt.focus();
+    document.execCommand('selectAll',false,null);
+  });
+
+  const handle=document.createElement('div');
+  handle.className='mm-handle'; handle.title='Drag to connect to another shape';
+  handle.addEventListener('mousedown', e=>{ e.stopPropagation(); e.preventDefault(); startMmConnect(n.id); });
+  el.appendChild(handle);
+
+  const resize=document.createElement('div');
+  resize.className='mm-resize-handle'; resize.title='Resize';
+  resize.addEventListener('mousedown', e=>{ e.stopPropagation(); e.preventDefault(); startMmResize(n.id,e); });
+  el.appendChild(resize);
+
+  el.addEventListener('mousedown', e=>{
+    if(txt.contentEditable==='true') return;
+    e.preventDefault();
+    selectMmNode(n.id);
+    startMmMove(n.id,e);
+  });
+  return el;
+}
+
+function selectMmNode(id){
+  mmSelectedEdgeId=null;
+  mmSelectedNodeId=id;
+  document.querySelectorAll('.mm-node').forEach(el=>el.classList.toggle('selected', el.dataset.id===id));
+  document.querySelectorAll('#mm-svg .mm-edge').forEach(el=>el.classList.remove('selected'));
+  updateMmDeleteBtn();
+}
+function selectMmEdge(id){
+  mmSelectedNodeId=null;
+  mmSelectedEdgeId=id;
+  document.querySelectorAll('.mm-node').forEach(el=>el.classList.remove('selected'));
+  document.querySelectorAll('#mm-svg g').forEach(g=>{
+    g.querySelector('.mm-edge').classList.toggle('selected', g.dataset.edgeId===id);
+  });
+  updateMmDeleteBtn();
+}
+function mmDeselectAll(){
+  mmSelectedNodeId=null; mmSelectedEdgeId=null;
+  document.querySelectorAll('.mm-node').forEach(el=>el.classList.remove('selected'));
+  document.querySelectorAll('#mm-svg .mm-edge').forEach(el=>el.classList.remove('selected'));
+  updateMmDeleteBtn();
+}
+function updateMmDeleteBtn(){
+  document.getElementById('mm-del-sel-btn').style.display=(mmSelectedNodeId||mmSelectedEdgeId)?'':'none';
+}
+
+function addMmNode(shape, x, y){
+  const map=activeMindMap();
+  if(!map){ toast('Create a mind map first'); return }
+  if(x===undefined){
+    const wrap=document.getElementById('mm-canvas-wrap');
+    x=wrap.scrollLeft+wrap.clientWidth/2-70;
+    y=wrap.scrollTop+wrap.clientHeight/2-28;
+  }
+  const isCircle=shape==='circle';
+  const node={
+    id: crypto.randomUUID(), shape,
+    x: Math.max(0,Math.round(x)), y: Math.max(0,Math.round(y)),
+    w: isCircle?110:140, h: isCircle?110:56,
+    text:'Idea', color: COLORS[map.nodes.length % COLORS.length],
+  };
+  map.nodes.push(node);
+  mmSelectedNodeId=node.id; mmSelectedEdgeId=null;
+  renderMmCanvas();
+  saveMindMap();
+}
+
+function startMmMove(id,e){
+  const map=activeMindMap(); const n=map.nodes.find(x=>x.id===id); if(!n) return;
+  const startX=e.clientX, startY=e.clientY, origX=n.x, origY=n.y;
+  const el=document.querySelector(`.mm-node[data-id="${id}"]`);
+  let moved=false;
+  function onMove(ev){
+    const dx=ev.clientX-startX, dy=ev.clientY-startY;
+    if(!moved && Math.abs(dx)<4 && Math.abs(dy)<4) return; // ignore tiny jitter so plain clicks don't count as drags
+    moved=true;
+    el.classList.add('dragging');
+    n.x=Math.max(0,Math.round(origX+dx)); n.y=Math.max(0,Math.round(origY+dy));
+    el.style.left=n.x+'px'; el.style.top=n.y+'px';
+    updateMmEdgesForNode(id);
+  }
+  function onUp(){
+    document.removeEventListener('mousemove',onMove);
+    document.removeEventListener('mouseup',onUp);
+    el.classList.remove('dragging');
+    // Only save (and reload) if the node actually moved — a plain click/double-click
+    // must NOT trigger a reload, or it rebuilds the node mid-gesture and breaks dblclick-to-edit.
+    if(moved) saveMindMap();
+  }
+  document.addEventListener('mousemove',onMove);
+  document.addEventListener('mouseup',onUp);
+}
+
+function startMmResize(id,e){
+  const map=activeMindMap(); const n=map.nodes.find(x=>x.id===id); if(!n) return;
+  const startX=e.clientX, startY=e.clientY, origW=n.w, origH=n.h;
+  const el=document.querySelector(`.mm-node[data-id="${id}"]`);
+  let moved=false;
+  function onMove(ev){
+    const dx=ev.clientX-startX, dy=ev.clientY-startY;
+    if(!moved && Math.abs(dx)<4 && Math.abs(dy)<4) return;
+    moved=true;
+    n.w=Math.max(50,Math.round(origW+dx)); n.h=Math.max(36,Math.round(origH+dy));
+    el.style.width=n.w+'px'; el.style.height=n.h+'px';
+    updateMmEdgesForNode(id);
+  }
+  function onUp(){
+    document.removeEventListener('mousemove',onMove);
+    document.removeEventListener('mouseup',onUp);
+    if(moved) saveMindMap();
+  }
+  document.addEventListener('mousemove',onMove);
+  document.addEventListener('mouseup',onUp);
+}
+
+function updateMmEdgesForNode(nodeId){
+  const map=activeMindMap();
+  (map.edges||[]).forEach(e=>{
+    if(e.from!==nodeId && e.to!==nodeId) return;
+    const a=map.nodes.find(n=>n.id===e.from), b=map.nodes.find(n=>n.id===e.to);
+    if(!a||!b) return;
+    const p1=mmNodeCenter(a), p2=mmNodeCenter(b);
+    const g=document.querySelector(`#mm-svg g[data-edge-id="${e.id}"]`);
+    if(!g) return;
+    g.querySelectorAll('line').forEach(l=>{ l.setAttribute('x1',p1.x); l.setAttribute('y1',p1.y); l.setAttribute('x2',p2.x); l.setAttribute('y2',p2.y); });
+  });
+}
+
+function startMmConnect(fromId){
+  const map=activeMindMap(); const a=map.nodes.find(x=>x.id===fromId); if(!a) return;
+  const svg=document.getElementById('mm-svg');
+  const canvas=document.getElementById('mm-canvas');
+  const p1=mmNodeCenter(a);
+  const tempLine=document.createElementNS('http://www.w3.org/2000/svg','line');
+  tempLine.setAttribute('x1',p1.x); tempLine.setAttribute('y1',p1.y);
+  tempLine.setAttribute('x2',p1.x); tempLine.setAttribute('y2',p1.y);
+  tempLine.setAttribute('class','mm-edge');
+  tempLine.style.strokeDasharray='4 3'; tempLine.style.stroke='var(--accent)';
+  svg.appendChild(tempLine);
+  function canvasPoint(ev){ const rect=canvas.getBoundingClientRect(); return { x: ev.clientX-rect.left, y: ev.clientY-rect.top }; }
+  function onMove(ev){ const p=canvasPoint(ev); tempLine.setAttribute('x2',p.x); tempLine.setAttribute('y2',p.y); }
+  function onUp(ev){
+    document.removeEventListener('mousemove',onMove);
+    document.removeEventListener('mouseup',onUp);
+    tempLine.remove();
+    const target=document.elementFromPoint(ev.clientX,ev.clientY);
+    const targetNodeEl=target?.closest('.mm-node');
+    if(targetNodeEl && targetNodeEl.dataset.id!==fromId){
+      const toId=targetNodeEl.dataset.id;
+      const exists=(map.edges||[]).some(ed=>(ed.from===fromId&&ed.to===toId)||(ed.from===toId&&ed.to===fromId));
+      if(!exists){
+        map.edges=map.edges||[];
+        map.edges.push({ id: crypto.randomUUID(), from: fromId, to: toId });
+        renderMmCanvas();
+        saveMindMap();
+      }
+    }
+  }
+  document.addEventListener('mousemove',onMove);
+  document.addEventListener('mouseup',onUp);
+}
+
+function deleteMmSelection(){
+  const map=activeMindMap(); if(!map) return;
+  if(mmSelectedNodeId){
+    if(!confirm('Delete this shape and its connections?')) return;
+    map.nodes=map.nodes.filter(n=>n.id!==mmSelectedNodeId);
+    map.edges=(map.edges||[]).filter(e=>e.from!==mmSelectedNodeId&&e.to!==mmSelectedNodeId);
+    mmSelectedNodeId=null;
+  } else if(mmSelectedEdgeId){
+    map.edges=(map.edges||[]).filter(e=>e.id!==mmSelectedEdgeId);
+    mmSelectedEdgeId=null;
+  } else return;
+  renderMmCanvas();
+  saveMindMap();
+}
+
+async function saveMindMap(){
+  const map=activeMindMap(); if(!map) return;
+  try{
+    await fetch(`${API}/mindmaps/${map.id}`,{method:'PATCH',body:JSON.stringify({name:map.name,nodes:map.nodes,edges:map.edges}),headers:{'Content-Type':'application/json'}});
+  }catch(e){ toast('Failed to save mind map'); return }
+  await load();
+}
+
+function openNewMindMapModal(){ document.getElementById('mm-name-input').value=''; openModal('modal-mindmap'); }
+async function createMindMap(){
+  const name=document.getElementById('mm-name-input').value.trim()||'Untitled Map';
+  const r=await fetch(`${API}/mindmaps`,{method:'POST',body:JSON.stringify({name}),headers:{'Content-Type':'application/json'}});
+  const map=await r.json();
+  mmActiveId=map.id;
+  closeModal('modal-mindmap');
+  await load();
+  toast('Mind map created');
+}
+async function renameMindMap(){
+  const map=activeMindMap(); if(!map) return;
+  const name=prompt('Rename mind map', map.name);
+  if(!name||!name.trim()) return;
+  map.name=name.trim();
+  await fetch(`${API}/mindmaps/${map.id}`,{method:'PATCH',body:JSON.stringify({name:map.name}),headers:{'Content-Type':'application/json'}});
+  await load();
+  toast('Renamed');
+}
+async function deleteMindMap(){
+  const map=activeMindMap(); if(!map) return;
+  if(!confirm(`Delete mind map "${map.name}"? This cannot be undone.`)) return;
+  await fetch(`${API}/mindmaps/${map.id}`,{method:'DELETE'});
+  mmActiveId=null;
+  await load();
+  toast('Mind map deleted');
+}
+
+// Click empty canvas to deselect; double-click empty canvas to add a shape there
+document.getElementById('mm-canvas-wrap').addEventListener('mousedown', e=>{
+  if(e.target.id==='mm-canvas-wrap' || e.target.id==='mm-canvas' || e.target.id==='mm-svg') mmDeselectAll();
+});
+document.getElementById('mm-canvas').addEventListener('dblclick', e=>{
+  if(e.target.id!=='mm-canvas' && e.target.id!=='mm-svg') return;
+  const rect=document.getElementById('mm-canvas').getBoundingClientRect();
+  addMmNode('rect', e.clientX-rect.left-70, e.clientY-rect.top-28);
+});
+document.addEventListener('keydown', e=>{
+  if((e.key==='Delete'||e.key==='Backspace') && document.getElementById('view-mindmap').classList.contains('active')){
+    if(document.activeElement && document.activeElement.isContentEditable) return;
+    if(document.activeElement && (document.activeElement.tagName==='INPUT'||document.activeElement.tagName==='TEXTAREA')) return;
+    if(mmSelectedNodeId||mmSelectedEdgeId){ e.preventDefault(); deleteMmSelection(); }
+  }
+});
+
+// ── Habits ─────────────────────────────────────
+const HB_DAYS=21;
+function habitById(id){ return data.habits.find(h=>h.id===id) }
+function isoDate(d){ const tz=d.getTimezoneOffset()*60000; return new Date(d-tz).toISOString().slice(0,10) }
+function isHabitScheduledOn(h, dateObj){
+  if(!h.schedule || h.schedule.type==='daily') return true;
+  return (h.schedule.days||[]).includes(dateObj.getDay());
+}
+function habitCreatedDate(h){ return h.createdAt ? parseDate(h.createdAt) : null }
+function habitCurrentStreak(h){
+  const today=new Date(); today.setHours(0,0,0,0);
+  const created=habitCreatedDate(h);
+  let d=new Date(today);
+  if(isHabitScheduledOn(h,d) && !h.entries[isoDate(d)]) d.setDate(d.getDate()-1);
+  let streak=0;
+  for(let i=0;i<3650;i++){
+    if(created && d<created) break;
+    if(isHabitScheduledOn(h,d)){
+      if(h.entries[isoDate(d)]) streak++;
+      else break;
+    }
+    d.setDate(d.getDate()-1);
+  }
+  return streak;
+}
+function lastScheduledBefore(h, dateExclusive){
+  const created=habitCreatedDate(h);
+  let d=new Date(dateExclusive); d.setDate(d.getDate()-1);
+  for(let i=0;i<400;i++){
+    if(created && d<created) return null;
+    if(isHabitScheduledOn(h,d)) return d;
+    d.setDate(d.getDate()-1);
+  }
+  return null;
+}
+function habitStats(h){
+  const today=new Date(); today.setHours(0,0,0,0);
+  const streak=habitCurrentStreak(h);
+  let best=0, run=0;
+  const allDates=Object.keys(h.entries||{}).sort();
+  if(allDates.length){
+    let d=parseDate(allDates[0]);
+    while(d<=today){
+      if(isHabitScheduledOn(h,d)){
+        if(h.entries[isoDate(d)]){ run++; best=Math.max(best,run) } else run=0;
+      }
+      d=new Date(d); d.setDate(d.getDate()+1);
+    }
+  }
+  best=Math.max(best,streak);
+  const y=today.getFullYear(), m=today.getMonth();
+  const created=habitCreatedDate(h);
+  let schedCount=0, doneCount=0;
+  for(let day=1; day<=today.getDate(); day++){
+    const d=new Date(y,m,day);
+    if(created && d<created) continue;
+    if(isHabitScheduledOn(h,d)){ schedCount++; if(h.entries[isoDate(d)]) doneCount++; }
+  }
+  const monthPct = schedCount? Math.round(doneCount/schedCount*100) : 0;
+  let status='new', label='New';
+  const lastSched=lastScheduledBefore(h,today);
+  if(lastSched){
+    const wasDone=!!h.entries[isoDate(lastSched)];
+    status = wasDone ? 'on' : 'off';
+    label = wasDone ? 'On track' : 'Off track';
+  } else if(isHabitScheduledOn(h,today) && h.entries[isoDate(today)]){
+    status='on'; label='On track';
+  }
+  return { streak, best, monthPct, status, label };
+}
+
+function renderHabits(){
+  document.getElementById('habits-overview').style.display = activeHabitId?'none':'';
+  document.getElementById('habits-detail').style.display = activeHabitId?'':'none';
+  if(activeHabitId) renderHabitDetail();
+  else renderHabitsGrid();
+}
+
+function renderHabitsGrid(){
+  const wrap=document.getElementById('hb-grid-wrap');
+  if(!data.habits.length){ wrap.innerHTML='<div class="empty">No habits yet. Add one to start tracking.</div>'; return }
+  const today=new Date(); today.setHours(0,0,0,0);
+  const days=[];
+  for(let i=HB_DAYS-1;i>=0;i--){ const d=new Date(today); d.setDate(d.getDate()-i); days.push(d); }
+  const dow=['S','M','T','W','T','F','S'];
+  const head=`<tr><th></th><th></th>${days.map(d=>`<th>${dow[d.getDay()]}<br>${d.getDate()}</th>`).join('')}</tr>`;
+  const rows=data.habits.map(h=>{
+    const st=habitStats(h);
+    const created=habitCreatedDate(h);
+    return `<tr>
+      <td class="hb-row-name" onclick="openHabitDetail('${h.id}')"><span class="proj-dot" style="background:${h.color};margin-right:6px"></span>${esc(h.name)}</td>
+      <td><span class="hb-status ${st.status}">${st.label}</span></td>
+      ${days.map(d=>{
+        const iso=isoDate(d);
+        const beforeCreated = created && d<created;
+        const scheduled=!beforeCreated && isHabitScheduledOn(h,d);
+        const done=!beforeCreated && !!h.entries[iso];
+        const future=d>today;
+        const cls=['hb-cell']; if(!scheduled) cls.push('unscheduled'); if(done) cls.push('done');
+        const style=done?`background:${h.color}`:'';
+        const clickable=!future && !beforeCreated;
+        return `<td><div class="${cls.join(' ')}" style="${style}" ${clickable?`onclick="toggleHabitDay('${h.id}','${iso}')"`:''} title="${iso}"></div></td>`;
+      }).join('')}
+    </tr>`;
+  }).join('');
+  wrap.innerHTML=`<table class="hb-grid"><thead>${head}</thead><tbody>${rows}</tbody></table>`;
+}
+
+async function toggleHabitDay(id, iso){
+  await fetch(`${API}/habits/${id}/toggle`,{method:'POST',body:JSON.stringify({date:iso}),headers:{'Content-Type':'application/json'}});
+  await load();
+}
+
+function openHabitDetail(id){ activeHabitId=id; hbCalYear=new Date().getFullYear(); hbCalMonth=new Date().getMonth(); renderHabits(); }
+function closeHabitDetail(){ activeHabitId=null; renderHabits(); }
+
+function renderHabitDetail(){
+  const h=habitById(activeHabitId);
+  if(!h){ activeHabitId=null; renderHabits(); return }
+  document.getElementById('hbd-dot').style.background=h.color;
+  document.getElementById('hbd-title').textContent=h.name;
+  const st=habitStats(h);
+  document.getElementById('hbd-status').textContent=st.label;
+  document.getElementById('hbd-status').className='hb-status '+st.status;
+  document.getElementById('hbd-streak').textContent=st.streak;
+  document.getElementById('hbd-best').textContent=st.best;
+  document.getElementById('hbd-month').textContent=st.monthPct+'%';
+  renderHbCalendar(h);
+}
+
+function hbCalNav(dir){ hbCalMonth+=dir; if(hbCalMonth<0){hbCalMonth=11;hbCalYear--} if(hbCalMonth>11){hbCalMonth=0;hbCalYear++} renderHbCalendar(habitById(activeHabitId)) }
+function hbCalGoToday(){ const n=new Date(); hbCalYear=n.getFullYear(); hbCalMonth=n.getMonth(); renderHbCalendar(habitById(activeHabitId)) }
+
+function renderHbCalendar(h){
+  if(!h) return;
+  const MONTH_NAMES=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  document.getElementById('hbd-cal-title').textContent=`${MONTH_NAMES[hbCalMonth]} ${hbCalYear}`;
+  const first=new Date(hbCalYear,hbCalMonth,1);
+  const startDow=first.getDay();
+  const daysInMonth=new Date(hbCalYear,hbCalMonth+1,0).getDate();
+  const daysInPrev=new Date(hbCalYear,hbCalMonth,0).getDate();
+  const today=new Date(); today.setHours(0,0,0,0);
+  const cells=[];
+  for(let i=startDow-1;i>=0;i--) cells.push({day:daysInPrev-i, other:true});
+  for(let d=1; d<=daysInMonth; d++) cells.push({day:d, other:false});
+  while(cells.length%7!==0) cells.push({day:cells.length,other:true});
+  const created=habitCreatedDate(h);
+  document.getElementById('hbd-cal-days').innerHTML=cells.map(c=>{
+    if(c.other) return `<div class="cal-cell other-month"><div class="cal-num">${c.day}</div></div>`;
+    const d=new Date(hbCalYear,hbCalMonth,c.day);
+    const iso=isoDate(d);
+    const isToday=d.toDateString()===today.toDateString();
+    const beforeCreated = created && d<created;
+    const scheduled=!beforeCreated && isHabitScheduledOn(h,d);
+    const done=!!h.entries[iso];
+    const future=d>today;
+    let cls='cal-cell'+(isToday?' today':'');
+    if(scheduled && done) cls+=' hb-done';
+    else if(scheduled && !future && !done) cls+=' hb-missed';
+    const clickable = scheduled && !future;
+    return `<div class="${cls}" ${clickable?`onclick="toggleHabitDay('${h.id}','${iso}')" style="cursor:pointer"`:''}>
+      <div class="cal-num">${c.day}</div>
+      ${scheduled?`<div style="font-size:14px">${done?'✅':(future?'':'✖')}</div>`:''}
+    </div>`;
+  }).join('');
+}
+
+function buildWeekdayPicker(){
+  const wrap=document.getElementById('mh-weekday-picker');
+  const names=['S','M','T','W','T','F','S'];
+  wrap.innerHTML=names.map((n,i)=>`<div class="weekday-chip ${habitScheduleDays.has(i)?'selected':''}" onclick="toggleHabitWeekday(${i},this)">${n}</div>`).join('');
+}
+function toggleHabitWeekday(i,el){
+  if(habitScheduleDays.has(i)) habitScheduleDays.delete(i); else habitScheduleDays.add(i);
+  el.classList.toggle('selected');
+}
+function setHabitScheduleType(type){
+  habitScheduleType=type;
+  document.getElementById('mh-weekday-field').style.display = type==='weekly' ? '' : 'none';
+}
+function openNewHabitModal(){
+  editingHabitId=null;
+  document.getElementById('mh-title').textContent='New Habit';
+  document.getElementById('mh-name').value='';
+  habitColor=COLORS[data.habits.length % COLORS.length];
+  habitScheduleType='daily';
+  habitScheduleDays=new Set([1,2,3,4,5]);
+  document.querySelector('input[name="mh-sched"][value="daily"]').checked=true;
+  document.getElementById('mh-weekday-field').style.display='none';
+  document.getElementById('mh-color-row').innerHTML=COLORS.map(c=>`<div class="color-swatch ${c===habitColor?'selected':''}" style="background:${c}" onclick="selectHabitColor('${c}',this)"></div>`).join('');
+  buildWeekdayPicker();
+  openModal('modal-habit');
+}
+function openEditHabitModal(){
+  const h=habitById(activeHabitId); if(!h) return;
+  editingHabitId=h.id;
+  document.getElementById('mh-title').textContent='Edit Habit';
+  document.getElementById('mh-name').value=h.name;
+  habitColor=h.color;
+  habitScheduleType=h.schedule?.type||'daily';
+  habitScheduleDays=new Set(h.schedule?.days||[1,2,3,4,5]);
+  document.querySelector(`input[name="mh-sched"][value="${habitScheduleType}"]`).checked=true;
+  document.getElementById('mh-weekday-field').style.display = habitScheduleType==='weekly'?'':'none';
+  document.getElementById('mh-color-row').innerHTML=COLORS.map(c=>`<div class="color-swatch ${c===habitColor?'selected':''}" style="background:${c}" onclick="selectHabitColor('${c}',this)"></div>`).join('');
+  buildWeekdayPicker();
+  openModal('modal-habit');
+}
+function selectHabitColor(c,el){ habitColor=c; document.querySelectorAll('#mh-color-row .color-swatch').forEach(s=>s.classList.remove('selected')); el.classList.add('selected') }
+async function saveHabitModal(){
+  const name=document.getElementById('mh-name').value.trim();
+  if(!name){ toast('Enter a habit name'); return }
+  const schedule = habitScheduleType==='weekly' ? { type:'weekly', days:[...habitScheduleDays].sort() } : { type:'daily' };
+  if(schedule.type==='weekly' && schedule.days.length===0){ toast('Pick at least one day'); return }
+  if(editingHabitId){
+    await fetch(`${API}/habits/${editingHabitId}`,{method:'PATCH',body:JSON.stringify({name,color:habitColor,schedule}),headers:{'Content-Type':'application/json'}});
+  } else {
+    await fetch(`${API}/habits`,{method:'POST',body:JSON.stringify({name,color:habitColor,schedule}),headers:{'Content-Type':'application/json'}});
+  }
+  closeModal('modal-habit');
+  await load();
+  toast(editingHabitId?'Habit updated':'Habit created');
+}
+async function deleteHabit(){
+  if(!activeHabitId) return;
+  const h=habitById(activeHabitId);
+  if(!confirm(`Delete habit "${h?.name}"? This removes all its tracking history.`)) return;
+  await fetch(`${API}/habits/${activeHabitId}`,{method:'DELETE'});
+  activeHabitId=null;
+  await load();
+  toast('Habit deleted');
+}
 
 // ── Close modals on backdrop click ────────────
 document.querySelectorAll('.modal-overlay').forEach(o=>o.addEventListener('click',e=>{ if(e.target===o) o.classList.remove('open') }));

@@ -50,6 +50,11 @@ const routes = [
   { pattern: /^\/api\/calendars$/, mod: "../api/calendars/index.js" },
   { pattern: /^\/api\/calendars\/([^/]+)\/sync$/, mod: "../api/calendars/[id]/sync.js", params: ["id"] },
   { pattern: /^\/api\/calendars\/([^/]+)$/, mod: "../api/calendars/[id].js", params: ["id"] },
+  { pattern: /^\/api\/mindmaps$/, mod: "../api/mindmaps/index.js" },
+  { pattern: /^\/api\/mindmaps\/([^/]+)$/, mod: "../api/mindmaps/[id].js", params: ["id"] },
+  { pattern: /^\/api\/habits$/, mod: "../api/habits/index.js" },
+  { pattern: /^\/api\/habits\/([^/]+)\/toggle$/, mod: "../api/habits/[id]/toggle.js", params: ["id"] },
+  { pattern: /^\/api\/habits\/([^/]+)$/, mod: "../api/habits/[id].js", params: ["id"] },
 ];
 
 const moduleCache = new Map();
