@@ -38,8 +38,8 @@ await new Promise((resolve) => kvServer.listen(0, "127.0.0.1", resolve));
 process.env.KV_REST_API_URL = `http://127.0.0.1:${kvServer.address().port}`;
 process.env.KV_REST_API_TOKEN = "dev-token";
 
-// ---- Single catch-all handler, mirroring api/[...all].js on Vercel ----
-const ALL_HANDLER_MOD = "../api/[...all].js";
+// ---- Single catch-all handler, mirroring api/handler.js + vercel.json's rewrite on Vercel ----
+const ALL_HANDLER_MOD = "../api/handler.js";
 let allHandler = null;
 async function loadHandler() {
   if (!allHandler) {
@@ -67,7 +67,7 @@ const server = http.createServer(async (req, res) => {
       return res.end("Not found");
     }
     const query = Object.fromEntries(url.searchParams);
-    query.all = all;
+    query.path = all;
     req.query = query;
     const raw = await readBody(req);
     if (raw) {

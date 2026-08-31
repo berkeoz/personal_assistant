@@ -7,8 +7,12 @@
 // app grows to, at the cost of the route dispatch living here instead of
 // being expressed as separate files.
 //
-// req.query.all is the array of path segments after /api/ (Vercel's
-// catch-all route convention), e.g. /api/tasks/123 -> ["tasks","123"].
+// This is a plain (non-bracket) filename because Vercel's file-based
+// `[...catchAll].js` routing convention is a Next.js-specific feature and
+// does not route on a plain/framework-less Vercel Functions project (it
+// deploys fine but nothing ever matches it). Instead, vercel.json rewrites
+// every /api/* request here with the original path in the `path` query
+// param, which this handler splits into segments itself.
 
 import { loadData, saveData } from "../lib/store.js";
 import { syncConnection, syncAll } from "../lib/ics.js";
@@ -16,7 +20,12 @@ import { syncConnection, syncAll } from "../lib/ics.js";
 export default async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
 
-  const segs = Array.isArray(req.query.all) ? req.query.all : req.query.all ? [req.query.all] : [];
+  const rawPath = req.query.path;
+  const segs = Array.isArray(rawPath)
+    ? rawPath
+    : typeof rawPath === "string"
+    ? rawPath.split("/").filter(Boolean)
+    : [];
   const [resource, id, sub] = segs;
 
   let body = req.body;
