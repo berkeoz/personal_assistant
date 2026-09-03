@@ -278,6 +278,13 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
 .hb-status.on{background:#1a3028;color:var(--green)}
 .hb-status.off{background:#3d1515;color:var(--red)}
 .hb-status.new{background:var(--surface3);color:var(--muted)}
+.hb-pct{font-size:10px;padding:2px 7px;border-radius:10px;white-space:nowrap;font-weight:700}
+.hb-pct.perfect{background:#2e2410;color:#facc15}
+.hb-pct.great{background:#1a3028;color:var(--green)}
+.hb-pct.poor{background:#3d1515;color:var(--red)}
+.val.perfect{color:#facc15}
+.val.great{color:var(--green)}
+.val.poor{color:var(--red)}
 .hb-detail-header{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .hb-stat-row{display:flex;gap:16px;flex-wrap:wrap}
 .hb-stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px;min-width:100px}
@@ -410,6 +417,8 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
   <button class="nav-btn" onclick="switchView('summary',this)" data-view="summary"><span class="ic">📊</span> Summary</button>
   <button class="nav-btn" onclick="switchView('mindmap',this)" data-view="mindmap"><span class="ic">🧠</span> Mind Map</button>
   <button class="nav-btn" onclick="switchView('habits',this)" data-view="habits"><span class="ic">🔁</span> Habits</button>
+  <button class="nav-btn" onclick="switchView('history',this)" data-view="history"><span class="ic">🕘</span> History</button>
+  <button class="nav-btn" onclick="switchView('teams',this)" data-view="teams"><span class="ic">👥</span> Teams</button>
   <button class="nav-btn" onclick="openImportModal()" style="color:var(--accent2)"><span class="ic">📥</span> Import .ics</button>
   <div class="nav-section">Calendar Sync <span id="cal-sync-badge" style="margin-left:auto;font-size:10px;color:var(--green)"></span></div>
   <div id="cal-conn-list"></div>
@@ -447,11 +456,11 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
       <button class="btn btn-primary" onclick="addTask()">+ Add</button>
     </div>
     <div class="filter-row">
-      <button class="chip active" onclick="setListFilter('all',this)">All</button>
-      <button class="chip" onclick="setListFilter('todo',this)">Todo</button>
-      <button class="chip" onclick="setListFilter('inprogress',this)">In Progress</button>
-      <button class="chip" onclick="setListFilter('done',this)">Done</button>
-      <button class="chip" onclick="setListFilter('overdue',this)">Overdue</button>
+      <button class="chip active" data-f="all" onclick="setListFilter('all',this)">All</button>
+      <button class="chip" data-f="todo" onclick="setListFilter('todo',this)">Todo</button>
+      <button class="chip" data-f="inprogress" onclick="setListFilter('inprogress',this)">In Progress</button>
+      <button class="chip" data-f="done" onclick="setListFilter('done',this)">Done</button>
+      <button class="chip" data-f="overdue" onclick="setListFilter('overdue',this)">Overdue</button>
     </div>
     <div class="task-list" id="task-list"></div>
   </div>
@@ -589,6 +598,7 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
       <span style="flex:1"></span>
       <button class="btn btn-ghost btn-sm" onclick="addMmNode('circle')">◯ Circle</button>
       <button class="btn btn-ghost btn-sm" onclick="addMmNode('rect')">▭ Rectangle</button>
+      <button class="btn btn-ghost btn-sm" id="mm-arrow-btn" onclick="cycleMmEdgeArrow()" style="display:none">Arrow: None</button>
       <button class="btn btn-danger btn-sm" id="mm-del-sel-btn" onclick="deleteMmSelection()" style="display:none">Delete Selected</button>
     </div>
     <div class="mm-canvas-wrap" id="mm-canvas-wrap">
@@ -639,6 +649,44 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
         </div>
       </div>
     </div>
+  </div>
+
+  <!-- History -->
+  <div class="view" id="view-history">
+    <div class="add-row">
+      <input class="flex1" id="hist-search" type="text" placeholder="Search completed tasks…" oninput="renderHistory()"/>
+    </div>
+    <div class="task-list" id="history-list"></div>
+  </div>
+
+  <!-- Teams -->
+  <div class="view" id="view-teams">
+    <div class="mm-toolbar">
+      <select class="mm-select" id="tb-select" onchange="selectTeamBoard(this.value)"></select>
+      <button class="btn btn-ghost btn-sm" onclick="openNewTeamBoardModal()">＋ New Board</button>
+      <button class="btn btn-ghost btn-sm" id="tb-rename-btn" onclick="renameTeamBoard()">Rename</button>
+      <button class="btn btn-danger btn-sm" id="tb-delete-btn" onclick="deleteTeamBoard()">Delete Board</button>
+    </div>
+    <div id="tb-content">
+      <div class="mm-toolbar">
+        <button class="chip active" id="tb-tab-board" onclick="setTbView('board')">📋 Board</button>
+        <button class="chip" id="tb-tab-history" onclick="setTbView('history')">🕘 History</button>
+        <span style="flex:1"></span>
+        <button class="btn btn-ghost btn-sm" onclick="openManageTeamModal()">Manage Team</button>
+      </div>
+      <div id="tb-board-view">
+        <div class="kb-toolbar" id="tb-assignee-row"></div>
+        <div class="kb-toolbar" id="tb-project-row"></div>
+        <div class="kanban-outer" id="tb-kanban-outer"></div>
+      </div>
+      <div id="tb-history-view" style="display:none">
+        <div class="add-row">
+          <input class="flex1" id="tb-hist-search" type="text" placeholder="Search completed tasks…" oninput="renderTbHistory()"/>
+        </div>
+        <div class="task-list" id="tb-history-list"></div>
+      </div>
+    </div>
+    <div class="empty" id="tb-empty" style="display:none">No team boards yet. Click "＋ New Board" above to create one (e.g. "Scotiabank").</div>
   </div>
 
 </div>
@@ -792,13 +840,74 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
   </div>
 </div>
 
+<!-- Modal: New Team Board -->
+<div class="modal-overlay" id="modal-teamboard">
+  <div class="modal">
+    <h3>New Team Board</h3>
+    <div class="field"><label>Board Name</label><input id="tb-name-input" placeholder="e.g. Scotiabank"/></div>
+    <div class="field"><label>Team Members (comma separated)</label><input id="tb-members-input" placeholder="e.g. Divya, Renuka, Rajashree, Rinu"/></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modal-teamboard')">Cancel</button>
+      <button class="btn btn-primary" onclick="createTeamBoard()">Create</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Manage Team (members + projects) -->
+<div class="modal-overlay" id="modal-tb-manage">
+  <div class="modal">
+    <h3>Manage Team</h3>
+    <div class="field"><label>Members</label>
+      <div id="tb-manage-members" class="subtask-editor"></div>
+      <div class="add-subtask-row"><input id="tb-new-member" type="text" placeholder="Add member name… (Enter)"/><button class="btn btn-ghost btn-sm" onclick="addTbMember()">+ Add</button></div>
+    </div>
+    <div class="field"><label>Projects</label>
+      <div id="tb-manage-projects" class="subtask-editor"></div>
+      <div class="add-subtask-row"><input id="tb-new-project" type="text" placeholder="Add project name… (Enter)"/><button class="btn btn-ghost btn-sm" onclick="addTbProject()">+ Add</button></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="closeModal('modal-tb-manage')">Done</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: New Team Column -->
+<div class="modal-overlay" id="modal-tb-col">
+  <div class="modal">
+    <h3>New Column</h3>
+    <div class="field"><label>Column Name</label><input id="tbc-name" placeholder="e.g. Review, Blocked…"/></div>
+    <div class="field"><label>Color</label><div class="color-row" id="tbc-color-row"></div></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modal-tb-col')">Cancel</button>
+      <button class="btn btn-primary" onclick="createTbColumn()">Create</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Team Task -->
+<div class="modal-overlay" id="modal-tb-task">
+  <div class="modal">
+    <h3 id="tbt-title">Task</h3>
+    <div class="field"><label>Task</label><input id="tbt-text"/></div>
+    <div class="field"><label>Status</label><select id="tbt-status"></select></div>
+    <div class="field"><label>Assignee</label><select id="tbt-assignee"></select></div>
+    <div class="field"><label>Projects</label><div class="proj-check-list" id="tbt-proj-list"></div></div>
+    <div class="field"><label>Due Date</label><input id="tbt-due" type="date"/></div>
+    <div class="field"><label>Notes</label><textarea id="tbt-notes" rows="3" placeholder="Add notes, links, details…" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--text);font-size:13px;outline:none;resize:vertical;font-family:inherit;transition:border-color .15s"></textarea></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modal-tb-task')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveTbTask()">Save</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <script>
 const API = '/api';
 const COLORS = ['#6c8eff','#a78bfa','#34d399','#fbbf24','#f87171','#fb923c','#38bdf8','#f472b6','#94a3b8'];
 let data = { columns: [], projects: [], tasks: [], mindmaps: [], habits: [] };
-let listFilter = 'all', kbProjFilter = null, pdFilter = 'all', pdProjectId = null;
+let listFilters = new Set(), kbProjFilter = null, pdFilter = 'all', pdProjectId = null;
 let hiddenCols = new Set();   // column IDs hidden in kanban
 let dragColId = null;         // column being dragged (for reorder)
 let editingTaskId = null, dragTaskId = null;
@@ -814,6 +923,9 @@ let mmActiveId = null, mmSelectedNodeId = null, mmSelectedEdgeId = null;
 let habitColor = COLORS[0], habitScheduleType = 'daily', habitScheduleDays = new Set([1,2,3,4,5]);
 let editingHabitId = null, activeHabitId = null;
 let hbCalYear = new Date().getFullYear(), hbCalMonth = new Date().getMonth();
+// Team board state
+let tbActiveId = null, tbHiddenCols = new Set(), tbProjFilter = null, tbAssigneeFilter = null, tbView = 'board';
+let tbDragTaskId = null, editingTbTaskId = null, tbNewColColor = COLORS[0];
 
 // ── Utilities ─────────────────────────────────
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') }
@@ -895,6 +1007,9 @@ async function load(){
   if(!data.tasks) data.tasks=[];
   if(!data.mindmaps) data.mindmaps=[];
   if(!data.habits) data.habits=[];
+  if(!data.settings) data.settings={};
+  if(!data.teamBoards) data.teamBoards=[];
+  hiddenCols = new Set(data.settings.kanbanHiddenCols||[]);
   renderAll();
 }
 
@@ -945,6 +1060,8 @@ function renderView(name){
   else if(name==='summary') renderSummary();
   else if(name==='mindmap') renderMindMap();
   else if(name==='habits') renderHabits();
+  else if(name==='history') renderHistory();
+  else if(name==='teams') renderTeams();
 }
 
 // ── Sidebar ────────────────────────────────────
@@ -1014,17 +1131,42 @@ async function toggleTask(id){
 async function confirmDel(id){ if(confirm('Delete this task?')){ await delTask(id); toast('Deleted') } }
 
 // ── All Tasks ──────────────────────────────────
-function setListFilter(f,btn){ listFilter=f; document.querySelectorAll('#view-list .chip').forEach(c=>c.classList.remove('active')); btn.classList.add('active'); renderList() }
-
+// Multiple filters can be active at once (e.g. Todo + In Progress) — a task
+// matches if it satisfies ANY selected filter. "All" clears the selection.
+function setListFilter(f,btn){
+  if(f==='all'){ listFilters.clear(); }
+  else{
+    if(listFilters.has(f)) listFilters.delete(f); else listFilters.add(f);
+  }
+  document.querySelectorAll('#view-list .chip').forEach(c=>{
+    const isAll=c.dataset.f==='all';
+    c.classList.toggle('active', isAll ? listFilters.size===0 : listFilters.has(c.dataset.f));
+  });
+  renderList();
+}
+function matchesListFilter(t,f){
+  if(f==='todo') return t.status==='todo';
+  if(f==='inprogress') return t.status!=='todo'&&t.status!=='done';
+  if(f==='done') return t.status==='done';
+  if(f==='overdue') return isOverdue(t);
+  return false;
+}
 function renderList(){
-  const now=new Date();
   let tasks=data.tasks;
-  if(listFilter==='todo') tasks=tasks.filter(t=>t.status==='todo');
-  else if(listFilter==='inprogress') tasks=tasks.filter(t=>t.status!=='todo'&&t.status!=='done');
-  else if(listFilter==='done') tasks=tasks.filter(t=>t.status==='done');
-  else if(listFilter==='overdue') tasks=tasks.filter(t=>isOverdue(t));
+  if(listFilters.size>0) tasks=tasks.filter(t=>[...listFilters].some(f=>matchesListFilter(t,f)));
   document.getElementById('task-list').innerHTML = tasks.length ? tasks.map(taskItemHTML).join('') : `<div class="empty">No tasks here.</div>`;
   buildMpickDD('li');
+}
+
+// ── History ────────────────────────────────────
+// Completed/archived tasks live here instead of piling up in a Kanban
+// column, sorted most-recently-finished first.
+function renderHistory(){
+  const q=(document.getElementById('hist-search').value||'').trim().toLowerCase();
+  let tasks=data.tasks.filter(t=>isCompleted(t));
+  if(q) tasks=tasks.filter(t=>t.text.toLowerCase().includes(q));
+  tasks=[...tasks].sort((a,b)=>(b.completedAt||'').localeCompare(a.completedAt||''));
+  document.getElementById('history-list').innerHTML = tasks.length ? tasks.map(taskItemHTML).join('') : `<div class="empty">No completed tasks yet.</div>`;
 }
 
 async function addTask(){
@@ -1134,9 +1276,12 @@ function renderKanban(){
   document.getElementById('kanban-outer').innerHTML = html;
 }
 
-function toggleColVisibility(id){
+async function toggleColVisibility(id){
   if(hiddenCols.has(id)) hiddenCols.delete(id); else hiddenCols.add(id);
   renderKanban();
+  try{
+    await fetch(`${API}/settings`,{method:'PATCH',body:JSON.stringify({kanbanHiddenCols:[...hiddenCols]}),headers:{'Content-Type':'application/json'}});
+  }catch(e){ toast('Failed to save column visibility'); }
 }
 
 function setKbFilter(id,btn){ kbProjFilter=id; document.querySelectorAll('#kb-proj-filter .chip').forEach(c=>c.classList.remove('active')); btn.classList.add('active'); renderKanban() }
@@ -1698,10 +1843,35 @@ function renderMmCanvas(){
   canvas.querySelectorAll('.mm-node').forEach(n=>n.remove());
   canvas.style.width=''; canvas.style.height=''; // re-fit to this map's own nodes, not a previous map's size
   if(!map){ svg.innerHTML=''; updateMmDeleteBtn(); return }
-  svg.innerHTML=(map.edges||[]).map(e=>mmEdgeSvg(e)).join('');
+  // Defs must be re-added every time since innerHTML is fully replaced below.
+  svg.innerHTML=MM_ARROW_DEFS+(map.edges||[]).map(e=>mmEdgeSvg(e)).join('');
   (map.nodes||[]).forEach(n=>canvas.appendChild(mmNodeEl(n)));
   updateMmDeleteBtn();
   updateMmCanvasSize();
+}
+
+const MM_ARROW_DEFS=`<defs>
+  <marker id="mm-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="var(--muted)"/></marker>
+  <marker id="mm-arrow-sel" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="var(--accent)"/></marker>
+</defs>`;
+
+// Where a straight line between two node centers crosses this node's own
+// boundary — so the line (and any arrowhead) stops at the shape's edge
+// instead of terminating hidden at its center.
+function mmBoundaryPoint(node, towardX, towardY){
+  const cx=node.x+node.w/2, cy=node.y+node.h/2;
+  const dx=towardX-cx, dy=towardY-cy;
+  if(dx===0 && dy===0) return {x:cx,y:cy};
+  if(node.shape==='circle'){
+    const rx=node.w/2, ry=node.h/2;
+    const t=1/Math.sqrt((dx/rx)**2+(dy/ry)**2);
+    return { x: cx+dx*t, y: cy+dy*t };
+  }
+  const halfW=node.w/2, halfH=node.h/2;
+  const tx = dx!==0 ? halfW/Math.abs(dx) : Infinity;
+  const ty = dy!==0 ? halfH/Math.abs(dy) : Infinity;
+  const t=Math.min(tx,ty);
+  return { x: cx+dx*t, y: cy+dy*t };
 }
 
 // The canvas grows to fit however far out nodes get dragged/resized, so
@@ -1726,9 +1896,15 @@ function mmEdgeSvg(e){
   const map=activeMindMap();
   const a=map.nodes.find(n=>n.id===e.from), b=map.nodes.find(n=>n.id===e.to);
   if(!a||!b) return '';
-  const p1=mmNodeCenter(a), p2=mmNodeCenter(b);
+  const ca=mmNodeCenter(a), cb=mmNodeCenter(b);
+  const p1=mmBoundaryPoint(a,cb.x,cb.y), p2=mmBoundaryPoint(b,ca.x,ca.y);
+  const sel=e.id===mmSelectedEdgeId;
+  const markerId=sel?'mm-arrow-sel':'mm-arrow';
+  const arrow=e.arrow||'none';
+  const markerEnd = (arrow==='one'||arrow==='two') ? ` marker-end="url(#${markerId})"` : '';
+  const markerStart = (arrow==='two') ? ` marker-start="url(#${markerId})"` : '';
   return `<g data-edge-id="${e.id}">
-    <line class="mm-edge ${e.id===mmSelectedEdgeId?'selected':''}" x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}"/>
+    <line class="mm-edge ${sel?'selected':''}" x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}"${markerEnd}${markerStart}/>
     <line class="mm-edge-hit" x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}" onclick="selectMmEdge('${e.id}')"/>
   </g>`;
 }
@@ -1803,8 +1979,26 @@ function mmDeselectAll(){
   document.querySelectorAll('#mm-svg .mm-edge').forEach(el=>el.classList.remove('selected'));
   updateMmDeleteBtn();
 }
+const MM_ARROW_LABELS={ none:'Arrow: None', one:'Arrow: One-way', two:'Arrow: Two-way' };
 function updateMmDeleteBtn(){
   document.getElementById('mm-del-sel-btn').style.display=(mmSelectedNodeId||mmSelectedEdgeId)?'':'none';
+  const arrowBtn=document.getElementById('mm-arrow-btn');
+  if(mmSelectedEdgeId){
+    const map=activeMindMap();
+    const edge=map?.edges?.find(e=>e.id===mmSelectedEdgeId);
+    arrowBtn.style.display='';
+    arrowBtn.textContent=MM_ARROW_LABELS[edge?.arrow||'none'];
+  } else {
+    arrowBtn.style.display='none';
+  }
+}
+function cycleMmEdgeArrow(){
+  const map=activeMindMap(); if(!map||!mmSelectedEdgeId) return;
+  const edge=map.edges.find(e=>e.id===mmSelectedEdgeId); if(!edge) return;
+  const order=['none','one','two'];
+  edge.arrow=order[(order.indexOf(edge.arrow||'none')+1)%order.length];
+  renderMmCanvas();
+  saveMindMap();
 }
 
 function addMmNode(shape, x, y){
@@ -1902,7 +2096,8 @@ function updateMmEdgesForNode(nodeId){
     if(e.from!==nodeId && e.to!==nodeId) return;
     const a=map.nodes.find(n=>n.id===e.from), b=map.nodes.find(n=>n.id===e.to);
     if(!a||!b) return;
-    const p1=mmNodeCenter(a), p2=mmNodeCenter(b);
+    const ca=mmNodeCenter(a), cb=mmNodeCenter(b);
+    const p1=mmBoundaryPoint(a,cb.x,cb.y), p2=mmBoundaryPoint(b,ca.x,ca.y);
     const g=document.querySelector(`#mm-svg g[data-edge-id="${e.id}"]`);
     if(!g) return;
     g.querySelectorAll('line').forEach(l=>{ l.setAttribute('x1',p1.x); l.setAttribute('y1',p1.y); l.setAttribute('x2',p2.x); l.setAttribute('y2',p2.y); });
@@ -2153,6 +2348,10 @@ function renderHabits(){
   else renderHabitsGrid();
 }
 
+// 100% = "Perfect", 80%+ = "Great", below = needs attention.
+function adherenceTier(pct){ return pct>=100?'perfect':pct>=80?'great':'poor' }
+function adherenceLabel(pct){ return pct>=100?'Perfect':pct>=80?'Great':'Needs work' }
+
 function renderHabitsGrid(){
   const wrap=document.getElementById('hb-grid-wrap');
   if(!data.habits.length){ wrap.innerHTML='<div class="empty">No habits yet. Add one to start tracking.</div>'; return }
@@ -2160,12 +2359,14 @@ function renderHabitsGrid(){
   const days=[];
   for(let i=HB_DAYS-1;i>=0;i--){ const d=new Date(today); d.setDate(d.getDate()-i); days.push(d); }
   const dow=['S','M','T','W','T','F','S'];
-  const head=`<tr><th></th><th></th>${days.map(d=>`<th>${dow[d.getDay()]}<br>${d.getDate()}</th>`).join('')}</tr>`;
+  const head=`<tr><th></th><th></th><th></th>${days.map(d=>`<th>${dow[d.getDay()]}<br>${d.getDate()}</th>`).join('')}</tr>`;
   const rows=data.habits.map(h=>{
     const st=habitStats(h);
+    const tier=adherenceTier(st.monthPct);
     return `<tr>
       <td class="hb-row-name" onclick="openHabitDetail('${h.id}')"><span class="proj-dot" style="background:${h.color};margin-right:6px"></span>${esc(h.name)}</td>
       <td><span class="hb-status ${st.status}">${st.label}</span></td>
+      <td><span class="hb-pct ${tier}" title="${adherenceLabel(st.monthPct)} this month">${st.monthPct}%</span></td>
       ${days.map(d=>{
         const iso=isoDate(d);
         const scheduled=isHabitScheduledOn(h,d);
@@ -2202,7 +2403,10 @@ function renderHabitDetail(){
   document.getElementById('hbd-status').className='hb-status '+st.status;
   document.getElementById('hbd-streak').textContent=st.streak;
   document.getElementById('hbd-best').textContent=st.best;
-  document.getElementById('hbd-month').textContent=st.monthPct+'%';
+  const monthEl=document.getElementById('hbd-month');
+  monthEl.textContent=st.monthPct+'%';
+  monthEl.className='val '+adherenceTier(st.monthPct);
+  monthEl.title=adherenceLabel(st.monthPct);
   document.getElementById('hbd-streak-lbl').textContent=isWeekly?'Week Streak':'Current Streak';
   document.getElementById('hbd-best-lbl').textContent=isWeekly?'Best Week Streak':'Best Streak';
   document.getElementById('hbd-week-stat').style.display=isWeekly?'':'none';
@@ -2322,6 +2526,293 @@ async function deleteHabit(){
   activeHabitId=null;
   await load();
   toast('Habit deleted');
+}
+
+// ── Team Boards ────────────────────────────────
+// Self-contained team Kanban boards (e.g. "Scotiabank") — their own member
+// roster, projects, columns and tasks, entirely separate from the personal
+// tasks/projects/columns above.
+function activeTeamBoard(){ return data.teamBoards.find(b=>b.id===tbActiveId) }
+function tbMemberById(board,id){ return board?.members.find(m=>m.id===id) }
+function tbProjectById(board,id){ return board?.projects.find(p=>p.id===id) }
+function tbColById(board,id){ return board?.columns.find(c=>c.id===id) }
+function tbIsCompleted(board,t){
+  const col=tbColById(board,t.status); if(!col) return false;
+  const n=col.name.toLowerCase();
+  return n==='done'||n.includes('archive')||n.includes('complet');
+}
+
+function renderTeams(){
+  const sel=document.getElementById('tb-select');
+  const empty=document.getElementById('tb-empty');
+  const content=document.getElementById('tb-content');
+  if(!data.teamBoards.length){
+    sel.innerHTML='<option value="">No boards yet</option>';
+    document.getElementById('tb-rename-btn').style.display='none';
+    document.getElementById('tb-delete-btn').style.display='none';
+    content.style.display='none'; empty.style.display='';
+    return;
+  }
+  document.getElementById('tb-rename-btn').style.display='';
+  document.getElementById('tb-delete-btn').style.display='';
+  content.style.display=''; empty.style.display='none';
+  if(!tbActiveId || !data.teamBoards.find(b=>b.id===tbActiveId)) tbActiveId=data.teamBoards[0].id;
+  sel.innerHTML=data.teamBoards.map(b=>`<option value="${b.id}" ${b.id===tbActiveId?'selected':''}>${esc(b.name)}</option>`).join('');
+  const board=activeTeamBoard();
+  tbHiddenCols=new Set(board.hiddenColumnIds||[]);
+  document.getElementById('tb-tab-board').classList.toggle('active', tbView==='board');
+  document.getElementById('tb-tab-history').classList.toggle('active', tbView==='history');
+  document.getElementById('tb-board-view').style.display = tbView==='board'?'':'none';
+  document.getElementById('tb-history-view').style.display = tbView==='history'?'':'none';
+  if(tbView==='board') renderTbBoard(); else renderTbHistory();
+}
+function selectTeamBoard(id){ tbActiveId=id; tbProjFilter=null; tbAssigneeFilter=null; renderTeams(); }
+function setTbView(v){ tbView=v; renderTeams(); }
+
+function renderTbBoard(){
+  const board=activeTeamBoard(); if(!board) return;
+
+  document.getElementById('tb-assignee-row').innerHTML = `<span class="kb-toolbar-label">Assignee:</span>
+    <button class="chip ${!tbAssigneeFilter?'active':''}" onclick="setTbAssigneeFilter(null)">All</button>
+    ${board.members.map(m=>`<button class="chip ${tbAssigneeFilter===m.id?'active':''}" onclick="setTbAssigneeFilter('${m.id}')"><span class="proj-dot" style="background:${m.color}"></span> ${esc(m.name)}</button>`).join('')}`;
+
+  document.getElementById('tb-project-row').innerHTML = `<span class="kb-toolbar-label">Project:</span>
+    <button class="chip ${!tbProjFilter?'active':''}" onclick="setTbProjFilter(null)">All</button>
+    ${board.projects.map(p=>`<button class="chip ${tbProjFilter===p.id?'active':''}" onclick="setTbProjFilter('${p.id}')">${esc(p.name)}</button>`).join('')}
+    <span style="flex:1"></span>
+    <span class="kb-toolbar-label">Columns:</span>
+    ${board.columns.map(col=>`<button class="col-vis-chip ${tbHiddenCols.has(col.id)?'hidden':'visible'}" onclick="toggleTbColVisibility('${col.id}')"><span style="width:8px;height:8px;border-radius:50%;background:${col.color};display:inline-block"></span>${esc(col.name)} ${tbHiddenCols.has(col.id)?'👁':'✓'}</button>`).join('')}`;
+
+  let tasks=board.tasks;
+  if(tbProjFilter) tasks=tasks.filter(t=>(t.projectIds||[]).includes(tbProjFilter));
+  if(tbAssigneeFilter) tasks=tasks.filter(t=>t.assigneeId===tbAssigneeFilter);
+  const visibleCols=board.columns.filter(c=>!tbHiddenCols.has(c.id));
+
+  let html=visibleCols.map(col=>{
+    const cards=tasks.filter(t=>t.status===col.id);
+    return `<div class="kanban-col" id="tbcol-${col.id}"
+      ondragover="tbDragOver(event,'${col.id}')"
+      ondrop="tbDrop(event,'${col.id}')"
+      ondragleave="tbDragLeave(event)">
+      <div class="kanban-header" style="border-top:3px solid ${col.color}">
+        <span class="kh-name" onclick="renameTbColumn('${col.id}')" title="Click to rename">${esc(col.name)}</span>
+        <span class="kh-count">${cards.length}</span>
+        <button class="kh-del" onclick="deleteTbColumn('${col.id}')" title="Delete column">×</button>
+      </div>
+      <div class="kanban-cards" id="tbkc-${col.id}">
+        ${cards.map(t=>{
+          const assignee=tbMemberById(board,t.assigneeId);
+          const projs=(t.projectIds||[]).map(pid=>tbProjectById(board,pid)).filter(Boolean);
+          return `<div class="kanban-card" draggable="true" ondragstart="tbDragStart(event,'${t.id}')" ondragend="tbDragEnd(event)" onclick="openEditTbTask('${t.id}')">
+            <div class="kc-text">${esc(t.text)}</div>
+            <div class="kc-meta">
+              ${assignee?`<span class="proj-tag" style="background:${assignee.color}">${esc(assignee.name)}</span>`:`<span class="tag">Unassigned</span>`}
+              ${projs.map(p=>`<span class="proj-tag" style="background:${p.color};font-size:10px;padding:1px 6px">${esc(p.name)}</span>`).join('')}
+              ${t.dueDate?`<span class="due-tag ${isOverdue(t)?'overdue':isToday(t)?'today':''}">${fmtDate(t.dueDate)}</span>`:''}
+              <button class="task-del" onclick="event.stopPropagation();confirmDelTbTask('${t.id}')">×</button>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+      <div class="kanban-add"><input placeholder="+ Quick add to ${esc(col.name)}…" onkeydown="tbQuickAdd(event,'${col.id}')"/></div>
+    </div>`;
+  }).join('');
+  html += `<div class="new-col-btn" onclick="openNewTbColumnModal()"><span style="font-size:22px">＋</span>Add Column</div>`;
+  document.getElementById('tb-kanban-outer').innerHTML=html;
+}
+function setTbProjFilter(id){ tbProjFilter=id; renderTbBoard(); }
+function setTbAssigneeFilter(id){ tbAssigneeFilter=id; renderTbBoard(); }
+
+// ── Team task drag-and-drop ──────────────────────
+function tbDragStart(e,id){ e.stopPropagation(); tbDragTaskId=id; e.target.classList.add('dragging'); }
+function tbDragEnd(e){ e.target.classList.remove('dragging'); document.querySelectorAll('#tb-kanban-outer .kanban-col').forEach(c=>c.classList.remove('drag-over')); }
+function tbDragOver(e,colId){
+  e.preventDefault(); e.stopPropagation();
+  document.querySelectorAll('#tb-kanban-outer .kanban-col').forEach(c=>c.classList.remove('drag-over'));
+  document.getElementById('tbcol-'+colId)?.classList.add('drag-over');
+}
+function tbDragLeave(e){ if(!e.currentTarget.contains(e.relatedTarget)) e.currentTarget.classList.remove('drag-over') }
+async function tbDrop(e,colId){
+  e.preventDefault(); e.stopPropagation();
+  document.querySelectorAll('#tb-kanban-outer .kanban-col').forEach(c=>c.classList.remove('drag-over'));
+  if(!tbDragTaskId) return;
+  const board=activeTeamBoard();
+  await fetch(`${API}/teamboards/${board.id}/tasks/${tbDragTaskId}`,{method:'PATCH',body:JSON.stringify({status:colId}),headers:{'Content-Type':'application/json'}});
+  tbDragTaskId=null;
+  await load();
+}
+async function tbQuickAdd(e,colId){
+  if(e.key!=='Enter') return;
+  const text=e.target.value.trim(); if(!text) return;
+  const board=activeTeamBoard();
+  await fetch(`${API}/teamboards/${board.id}/tasks`,{method:'POST',body:JSON.stringify({text,status:colId}),headers:{'Content-Type':'application/json'}});
+  e.target.value=''; await load(); toast('Task added');
+}
+
+// ── Team columns ─────────────────────────────────
+async function renameTbColumn(id){
+  const board=activeTeamBoard(); const col=tbColById(board,id); if(!col) return;
+  const name=prompt('Rename column:',col.name); if(!name||name===col.name) return;
+  await fetch(`${API}/teamboards/${board.id}/columns/${id}`,{method:'PATCH',body:JSON.stringify({name}),headers:{'Content-Type':'application/json'}});
+  await load(); toast('Column renamed');
+}
+async function deleteTbColumn(id){
+  const board=activeTeamBoard();
+  if(board.columns.length<=1){ toast('Cannot delete the last column'); return }
+  const col=tbColById(board,id);
+  const cnt=board.tasks.filter(t=>t.status===id).length;
+  const msg=cnt?`Delete "${col?.name}" and move ${cnt} task(s) to another column?`:`Delete column "${col?.name}"?`;
+  if(!confirm(msg)) return;
+  await fetch(`${API}/teamboards/${board.id}/columns/${id}`,{method:'DELETE'});
+  await load(); toast('Column deleted');
+}
+function openNewTbColumnModal(){
+  document.getElementById('tbc-name').value='';
+  tbNewColColor=COLORS[0];
+  document.getElementById('tbc-color-row').innerHTML=COLORS.map(c=>`<div class="color-swatch ${c===tbNewColColor?'selected':''}" style="background:${c}" onclick="selectTbColColor('${c}',this)"></div>`).join('');
+  openModal('modal-tb-col');
+}
+function selectTbColColor(c,el){ tbNewColColor=c; document.querySelectorAll('#tbc-color-row .color-swatch').forEach(s=>s.classList.remove('selected')); el.classList.add('selected') }
+async function createTbColumn(){
+  const board=activeTeamBoard();
+  const name=document.getElementById('tbc-name').value.trim(); if(!name) return;
+  await fetch(`${API}/teamboards/${board.id}/columns`,{method:'POST',body:JSON.stringify({name,color:tbNewColColor}),headers:{'Content-Type':'application/json'}});
+  closeModal('modal-tb-col'); await load(); toast('Column created');
+}
+async function toggleTbColVisibility(id){
+  if(tbHiddenCols.has(id)) tbHiddenCols.delete(id); else tbHiddenCols.add(id);
+  renderTbBoard();
+  const board=activeTeamBoard();
+  try{
+    await fetch(`${API}/teamboards/${board.id}`,{method:'PATCH',body:JSON.stringify({hiddenColumnIds:[...tbHiddenCols]}),headers:{'Content-Type':'application/json'}});
+  }catch(e){ toast('Failed to save column visibility'); }
+}
+
+// ── Team boards CRUD ──────────────────────────────
+function openNewTeamBoardModal(){
+  const first=data.teamBoards.length===0;
+  document.getElementById('tb-name-input').value = first ? 'Scotiabank' : '';
+  document.getElementById('tb-members-input').value = first ? 'Divya, Renuka, Rajashree, Rinu' : '';
+  openModal('modal-teamboard');
+}
+async function createTeamBoard(){
+  const name=document.getElementById('tb-name-input').value.trim()||'Untitled Team';
+  const memberNames=document.getElementById('tb-members-input').value.split(',').map(s=>s.trim()).filter(Boolean);
+  const r=await fetch(`${API}/teamboards`,{method:'POST',body:JSON.stringify({name,memberNames}),headers:{'Content-Type':'application/json'}});
+  const board=await r.json();
+  tbActiveId=board.id;
+  closeModal('modal-teamboard');
+  await load();
+  toast('Team board created');
+}
+async function renameTeamBoard(){
+  const board=activeTeamBoard(); if(!board) return;
+  const name=prompt('Rename board',board.name); if(!name||!name.trim()) return;
+  await fetch(`${API}/teamboards/${board.id}`,{method:'PATCH',body:JSON.stringify({name:name.trim()}),headers:{'Content-Type':'application/json'}});
+  await load(); toast('Renamed');
+}
+async function deleteTeamBoard(){
+  const board=activeTeamBoard(); if(!board) return;
+  if(!confirm(`Delete team board "${board.name}"? This cannot be undone.`)) return;
+  await fetch(`${API}/teamboards/${board.id}`,{method:'DELETE'});
+  tbActiveId=null;
+  await load(); toast('Team board deleted');
+}
+
+// ── Manage Team modal (members + projects) ────────
+function openManageTeamModal(){ renderManageTeamModal(); openModal('modal-tb-manage'); }
+function renderManageTeamModal(){
+  const board=activeTeamBoard(); if(!board) return;
+  document.getElementById('tb-manage-members').innerHTML = board.members.length ? board.members.map(m=>`
+    <div class="subtask-row"><span class="proj-dot" style="background:${m.color}"></span><span style="flex:1;font-size:13px">${esc(m.name)}</span><button onclick="removeTbMember('${m.id}')">×</button></div>`).join('') : `<div style="font-size:12px;color:var(--muted)">No members yet.</div>`;
+  document.getElementById('tb-manage-projects').innerHTML = board.projects.length ? board.projects.map(p=>`
+    <div class="subtask-row"><span class="proj-dot" style="background:${p.color}"></span><span style="flex:1;font-size:13px">${esc(p.name)}</span><button onclick="removeTbProject('${p.id}')">×</button></div>`).join('') : `<div style="font-size:12px;color:var(--muted)">No projects yet.</div>`;
+}
+async function addTbMember(){
+  const input=document.getElementById('tb-new-member');
+  const name=input.value.trim(); if(!name) return;
+  const board=activeTeamBoard();
+  await fetch(`${API}/teamboards/${board.id}/members`,{method:'POST',body:JSON.stringify({name}),headers:{'Content-Type':'application/json'}});
+  input.value='';
+  await load(); renderManageTeamModal(); toast('Member added');
+}
+document.getElementById('tb-new-member').addEventListener('keydown',e=>{ if(e.key==='Enter') addTbMember() });
+async function removeTbMember(id){
+  if(!confirm('Remove this team member? Their tasks will become unassigned.')) return;
+  const board=activeTeamBoard();
+  await fetch(`${API}/teamboards/${board.id}/members/${id}`,{method:'DELETE'});
+  await load(); renderManageTeamModal(); toast('Member removed');
+}
+async function addTbProject(){
+  const input=document.getElementById('tb-new-project');
+  const name=input.value.trim(); if(!name) return;
+  const board=activeTeamBoard();
+  const color=COLORS[board.projects.length % COLORS.length];
+  await fetch(`${API}/teamboards/${board.id}/projects`,{method:'POST',body:JSON.stringify({name,color}),headers:{'Content-Type':'application/json'}});
+  input.value='';
+  await load(); renderManageTeamModal(); toast('Project added');
+}
+document.getElementById('tb-new-project').addEventListener('keydown',e=>{ if(e.key==='Enter') addTbProject() });
+async function removeTbProject(id){
+  if(!confirm('Delete this project?')) return;
+  const board=activeTeamBoard();
+  await fetch(`${API}/teamboards/${board.id}/projects/${id}`,{method:'DELETE'});
+  await load(); renderManageTeamModal(); toast('Project deleted');
+}
+
+// ── Team task edit modal ───────────────────────────
+function openEditTbTask(id){
+  const board=activeTeamBoard(); const t=board.tasks.find(x=>x.id===id); if(!t) return;
+  editingTbTaskId=id;
+  document.getElementById('tbt-title').textContent='Edit Task';
+  document.getElementById('tbt-text').value=t.text||'';
+  document.getElementById('tbt-status').innerHTML=board.columns.map(c=>`<option value="${c.id}" ${t.status===c.id?'selected':''}>${esc(c.name)}</option>`).join('');
+  document.getElementById('tbt-assignee').innerHTML='<option value="">Unassigned</option>'+board.members.map(m=>`<option value="${m.id}" ${t.assigneeId===m.id?'selected':''}>${esc(m.name)}</option>`).join('');
+  document.getElementById('tbt-due').value=t.dueDate?t.dueDate.slice(0,10):'';
+  document.getElementById('tbt-notes').value=t.notes||'';
+  document.getElementById('tbt-proj-list').innerHTML=board.projects.length ? board.projects.map(p=>`
+    <label class="proj-check-item"><input type="checkbox" value="${p.id}" ${(t.projectIds||[]).includes(p.id)?'checked':''}/><span class="proj-dot" style="background:${p.color}"></span>${esc(p.name)}</label>`).join('') : `<div style="font-size:12px;color:var(--muted)">No projects yet — add one via Manage Team.</div>`;
+  openModal('modal-tb-task');
+}
+async function saveTbTask(){
+  const board=activeTeamBoard();
+  const text=document.getElementById('tbt-text').value.trim(); if(!text){ toast('Enter task text'); return }
+  const status=document.getElementById('tbt-status').value;
+  const assigneeId=document.getElementById('tbt-assignee').value||null;
+  const due=document.getElementById('tbt-due').value;
+  const notes=document.getElementById('tbt-notes').value.trim();
+  const projectIds=[...document.querySelectorAll('#tbt-proj-list input:checked')].map(c=>c.value);
+  await fetch(`${API}/teamboards/${board.id}/tasks/${editingTbTaskId}`,{method:'PATCH',body:JSON.stringify({text,status,assigneeId,dueDate:due||null,notes:notes||null,projectIds}),headers:{'Content-Type':'application/json'}});
+  closeModal('modal-tb-task');
+  await load(); toast('Saved');
+}
+async function confirmDelTbTask(id){
+  if(!confirm('Delete this task?')) return;
+  const board=activeTeamBoard();
+  await fetch(`${API}/teamboards/${board.id}/tasks/${id}`,{method:'DELETE'});
+  await load(); toast('Deleted');
+}
+
+// ── Team History ───────────────────────────────────
+function renderTbHistory(){
+  const board=activeTeamBoard(); if(!board) return;
+  const q=(document.getElementById('tb-hist-search').value||'').trim().toLowerCase();
+  let tasks=board.tasks.filter(t=>tbIsCompleted(board,t));
+  if(q) tasks=tasks.filter(t=>t.text.toLowerCase().includes(q));
+  tasks=[...tasks].sort((a,b)=>(b.completedAt||'').localeCompare(a.completedAt||''));
+  document.getElementById('tb-history-list').innerHTML = tasks.length ? tasks.map(t=>{
+    const assignee=tbMemberById(board,t.assigneeId);
+    const projs=(t.projectIds||[]).map(pid=>tbProjectById(board,pid)).filter(Boolean);
+    return `<div class="task-item done">
+      <span class="task-text">${esc(t.text)}</span>
+      <div class="task-meta">
+        ${assignee?`<span class="proj-tag" style="background:${assignee.color}">${esc(assignee.name)}</span>`:''}
+        ${projs.map(p=>`<span class="proj-tag" style="background:${p.color}">${esc(p.name)}</span>`).join('')}
+        <button class="btn btn-ghost btn-sm" onclick="openEditTbTask('${t.id}')">✏</button>
+        <button class="task-del" onclick="confirmDelTbTask('${t.id}')">×</button>
+      </div>
+    </div>`;
+  }).join('') : `<div class="empty">No completed tasks yet.</div>`;
 }
 
 // ── Close modals on backdrop click ────────────
