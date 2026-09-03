@@ -7,6 +7,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
 <meta http-equiv="Pragma" content="no-cache"/>
 <meta http-equiv="Expires" content="0"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -468,6 +469,7 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
       <button class="chip" data-f="inprogress" onclick="setListFilter('inprogress',this)">In Progress</button>
       <button class="chip" data-f="done" onclick="setListFilter('done',this)">Done</button>
       <button class="chip" data-f="overdue" onclick="setListFilter('overdue',this)">Overdue</button>
+      <button class="btn btn-ghost btn-sm" style="margin-left:auto" onclick="openExportModal('personal')">⬇ Export</button>
     </div>
     <div class="task-list" id="task-list"></div>
   </div>
@@ -681,6 +683,7 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
         <button class="chip" id="tb-tab-history" onclick="setTbView('history')">🕘 History</button>
         <span style="flex:1"></span>
         <button class="btn btn-primary btn-sm" onclick="openNewTbTaskModal()">＋ Add Task</button>
+        <button class="btn btn-ghost btn-sm" onclick="openExportModal('team')">⬇ Export</button>
         <button class="btn btn-ghost btn-sm" onclick="openManageTeamModal()">Manage Team</button>
       </div>
       <div id="tb-board-view">
@@ -910,6 +913,35 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
   </div>
 </div>
 
+<!-- Modal: Export Tasks -->
+<div class="modal-overlay" id="modal-export">
+  <div class="modal" style="width:480px;max-width:96vw">
+    <h3 id="exp-title">Export Tasks</h3>
+    <div class="field"><label>Status</label><div class="filter-row" id="exp-status-row"></div></div>
+    <div class="field"><label>Project</label><div class="filter-row" id="exp-project-row"></div></div>
+    <div class="field" id="exp-assignee-field"><label>Assignee</label><div class="filter-row" id="exp-assignee-row"></div></div>
+    <div class="field"><label>Due Date Range (optional)</label>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input id="exp-due-from" type="date" style="flex:1" onchange="updateExportCount()"/>
+        <span style="color:var(--muted);font-size:12px">to</span>
+        <input id="exp-due-to" type="date" style="flex:1" onchange="updateExportCount()"/>
+      </div>
+    </div>
+    <div class="field"><label>Format</label>
+      <div style="display:flex;gap:14px;flex-wrap:wrap">
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="radio" name="exp-format" value="text" checked/> Text list</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="radio" name="exp-format" value="csv"/> CSV</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="radio" name="exp-format" value="xlsx"/> Excel (.xlsx)</label>
+      </div>
+    </div>
+    <div style="font-size:12px;color:var(--muted)" id="exp-count">0 tasks match these filters</div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modal-export')">Cancel</button>
+      <button class="btn btn-primary" onclick="runExport()">Export</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <script>
@@ -935,6 +967,9 @@ let hbCalYear = new Date().getFullYear(), hbCalMonth = new Date().getMonth();
 // Team board state
 let tbActiveId = null, tbHiddenCols = new Set(), tbProjFilter = null, tbAssigneeFilter = null, tbView = 'board';
 let tbDragTaskId = null, editingTbTaskId = null, tbNewColColor = COLORS[0];
+// Export state
+let exportScope = 'personal', exportBoardId = null;
+let exportStatusSel = new Set(), exportProjectSel = new Set(), exportAssigneeSel = new Set();
 
 // ── Utilities ─────────────────────────────────
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') }
@@ -2863,6 +2898,127 @@ function renderTbHistory(){
       </div>
     </div>`;
   }).join('') : `<div class="empty">No completed tasks yet.</div>`;
+}
+
+// ── Export ─────────────────────────────────────
+// Exports either the personal task list or one Teams board's tasks, filtered
+// by status/project/(assignee)/due-date-range, as a plain text checklist,
+// CSV, or a real .xlsx (via SheetJS, loaded from cdnjs).
+function openExportModal(scope){
+  exportScope=scope;
+  exportStatusSel=new Set(); exportProjectSel=new Set(); exportAssigneeSel=new Set();
+  document.getElementById('exp-due-from').value='';
+  document.getElementById('exp-due-to').value='';
+  document.querySelector('input[name="exp-format"][value="text"]').checked=true;
+
+  let columns, projects, members=null, title;
+  if(scope==='team'){
+    const board=activeTeamBoard();
+    if(!board){ toast('Create or select a team board first'); return }
+    exportBoardId=board.id;
+    columns=board.columns; projects=board.projects; members=board.members;
+    title=`Export "${board.name}" Tasks`;
+  } else {
+    columns=data.columns; projects=data.projects;
+    title='Export Tasks';
+  }
+  document.getElementById('exp-title').textContent=title;
+  document.getElementById('exp-status-row').innerHTML=columns.map(c=>`<button type="button" class="chip" onclick="toggleExportSel(exportStatusSel,'${c.id}',this)">${esc(c.name)}</button>`).join('');
+  document.getElementById('exp-project-row').innerHTML=projects.length ? projects.map(p=>`<button type="button" class="chip" onclick="toggleExportSel(exportProjectSel,'${p.id}',this)">${esc(p.name)}</button>`).join('') : `<span style="font-size:12px;color:var(--muted)">No projects</span>`;
+  document.getElementById('exp-assignee-field').style.display = members ? '' : 'none';
+  if(members) document.getElementById('exp-assignee-row').innerHTML = members.map(m=>`<button type="button" class="chip" onclick="toggleExportSel(exportAssigneeSel,'${m.id}',this)">${esc(m.name)}</button>`).join('');
+  updateExportCount();
+  openModal('modal-export');
+}
+function toggleExportSel(set,id,btn){
+  if(set.has(id)) set.delete(id); else set.add(id);
+  btn.classList.toggle('active');
+  updateExportCount();
+}
+function getExportRows(){
+  let tasks, columns, projects, members=null;
+  if(exportScope==='team'){
+    const board=data.teamBoards.find(b=>b.id===exportBoardId); if(!board) return [];
+    tasks=board.tasks; columns=board.columns; projects=board.projects; members=board.members;
+  } else {
+    tasks=data.tasks; columns=data.columns; projects=data.projects;
+  }
+  const from=document.getElementById('exp-due-from').value;
+  const to=document.getElementById('exp-due-to').value;
+  return tasks.filter(t=>{
+    if(exportStatusSel.size && !exportStatusSel.has(t.status)) return false;
+    if(exportProjectSel.size && !(t.projectIds||[]).some(pid=>exportProjectSel.has(pid))) return false;
+    if(members && exportAssigneeSel.size && !exportAssigneeSel.has(t.assigneeId)) return false;
+    const due=t.dueDate?t.dueDate.slice(0,10):null;
+    if(from && (!due||due<from)) return false;
+    if(to && (!due||due>to)) return false;
+    return true;
+  }).map(t=>{
+    const col=columns.find(c=>c.id===t.status);
+    const projNames=(t.projectIds||[]).map(pid=>projects.find(p=>p.id===pid)?.name).filter(Boolean).join(', ');
+    const row={ Task:t.text||'', Status:col?.name||t.status||'' };
+    if(members) row.Assignee = members.find(m=>m.id===t.assigneeId)?.name || 'Unassigned';
+    row.Project=projNames;
+    row.DueDate=t.dueDate?t.dueDate.slice(0,10):'';
+    row.Tags=(t.tags||[]).join(', ');
+    row.Notes=t.notes||'';
+    return row;
+  });
+}
+function updateExportCount(){
+  const n=getExportRows().length;
+  document.getElementById('exp-count').textContent=`${n} task${n===1?'':'s'} match these filters`;
+}
+function exportFilename(ext){
+  const base = exportScope==='team' ? (data.teamBoards.find(b=>b.id===exportBoardId)?.name||'team') : 'tasks';
+  return `${base.replace(/\s+/g,'-').toLowerCase()}-export-${isoDate(new Date())}.${ext}`;
+}
+function downloadBlob(content,filename,mime){
+  const blob=new Blob([content],{type:mime});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download=filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+function csvEscape(v){
+  const s=String(v??'');
+  return /[",\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s;
+}
+function exportAsText(rows){
+  const lines=rows.map(r=>{
+    const done=/done|archive|complet/i.test(r.Status||'');
+    const parts=[`[${done?'x':' '}] ${r.Task}`];
+    if(r.Status) parts.push(`Status: ${r.Status}`);
+    if(r.Assignee!==undefined) parts.push(`Assignee: ${r.Assignee}`);
+    if(r.Project) parts.push(`Project: ${r.Project}`);
+    if(r.DueDate) parts.push(`Due: ${r.DueDate}`);
+    if(r.Tags) parts.push(`Tags: ${r.Tags}`);
+    return parts.join('  |  ');
+  });
+  downloadBlob(lines.join('\n'), exportFilename('txt'), 'text/plain');
+}
+function exportAsCsv(rows){
+  const headers=Object.keys(rows[0]);
+  const lines=[headers.join(',')].concat(rows.map(r=>headers.map(h=>csvEscape(r[h])).join(',')));
+  downloadBlob(lines.join('\r\n'), exportFilename('csv'), 'text/csv');
+}
+function exportAsXlsx(rows){
+  if(typeof XLSX==='undefined'){ toast('Excel export library is still loading — try again in a moment'); return }
+  const ws=XLSX.utils.json_to_sheet(rows);
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Tasks');
+  XLSX.writeFile(wb,exportFilename('xlsx'));
+}
+function runExport(){
+  const rows=getExportRows();
+  if(!rows.length){ toast('No tasks match these filters'); return }
+  const format=document.querySelector('input[name="exp-format"]:checked').value;
+  if(format==='text') exportAsText(rows);
+  else if(format==='csv') exportAsCsv(rows);
+  else exportAsXlsx(rows);
+  closeModal('modal-export');
+  toast(`Exported ${rows.length} task${rows.length===1?'':'s'}`);
 }
 
 // ── Close modals on backdrop click ────────────
