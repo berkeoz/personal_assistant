@@ -147,7 +147,14 @@ export default async function handler(req, res) {
         await saveData(data);
         return ok(proj);
       }
-      if (req.method !== "DELETE") return methodNotAllowed("DELETE");
+      const proj = data.projects.find((p) => p.id === id);
+      if (req.method === "PATCH") {
+        if (!proj) return notFound();
+        Object.assign(proj, body);
+        await saveData(data);
+        return ok(proj);
+      }
+      if (req.method !== "DELETE") return methodNotAllowed("PATCH, DELETE");
       data.projects = data.projects.filter((p) => p.id !== id);
       for (const t of data.tasks) {
         if (Array.isArray(t.projectIds)) t.projectIds = t.projectIds.filter((pid) => pid !== id);
@@ -357,7 +364,14 @@ export default async function handler(req, res) {
           await saveData(data);
           return ok(proj);
         }
-        if (req.method !== "DELETE") return methodNotAllowed("DELETE");
+        const proj = board.projects.find((p) => p.id === subId);
+        if (req.method === "PATCH") {
+          if (!proj) return notFound();
+          Object.assign(proj, body);
+          await saveData(data);
+          return ok(proj);
+        }
+        if (req.method !== "DELETE") return methodNotAllowed("PATCH, DELETE");
         board.projects = board.projects.filter((p) => p.id !== subId);
         for (const t of board.tasks) {
           if (Array.isArray(t.projectIds)) t.projectIds = t.projectIds.filter((pid) => pid !== subId);

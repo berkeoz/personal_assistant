@@ -537,6 +537,7 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
     <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
       <span id="pd-dot" class="proj-dot" style="width:12px;height:12px"></span>
       <h2 id="pd-title" style="font-size:18px"></h2>
+      <button class="btn btn-ghost btn-sm" onclick="renameCurrentProject()">Rename</button>
       <button class="btn btn-danger btn-sm" onclick="deleteCurrentProject()">Delete Project</button>
     </div>
     <div class="add-row">
@@ -679,6 +680,7 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
         <button class="chip active" id="tb-tab-board" onclick="setTbView('board')">📋 Board</button>
         <button class="chip" id="tb-tab-history" onclick="setTbView('history')">🕘 History</button>
         <span style="flex:1"></span>
+        <button class="btn btn-primary btn-sm" onclick="openNewTbTaskModal()">＋ Add Task</button>
         <button class="btn btn-ghost btn-sm" onclick="openManageTeamModal()">Manage Team</button>
       </div>
       <div id="tb-board-view">
@@ -1510,6 +1512,12 @@ async function addTaskToProject(){
 }
 document.getElementById('pd-text').addEventListener('keydown',e=>{ if(e.key==='Enter') addTaskToProject() });
 
+async function renameCurrentProject(){
+  const proj=findProject(pdProjectId); if(!proj) return;
+  const name=prompt('Rename project',proj.name); if(!name||!name.trim()||name.trim()===proj.name) return;
+  await fetch(`${API}/projects/${pdProjectId}`,{method:'PATCH',body:JSON.stringify({name:name.trim()}),headers:{'Content-Type':'application/json'}});
+  await load(); toast('Project renamed');
+}
 async function deleteCurrentProject(){
   if(!confirm('Delete this project? Tasks will remain but lose this project tag.')) return;
   await fetch(`${API}/projects/${pdProjectId}`,{method:'DELETE'});
@@ -2735,9 +2743,21 @@ function openManageTeamModal(){ renderManageTeamModal(); openModal('modal-tb-man
 function renderManageTeamModal(){
   const board=activeTeamBoard(); if(!board) return;
   document.getElementById('tb-manage-members').innerHTML = board.members.length ? board.members.map(m=>`
-    <div class="subtask-row"><span class="proj-dot" style="background:${m.color}"></span><span style="flex:1;font-size:13px">${esc(m.name)}</span><button onclick="removeTbMember('${m.id}')">×</button></div>`).join('') : `<div style="font-size:12px;color:var(--muted)">No members yet.</div>`;
+    <div class="subtask-row"><span class="proj-dot" style="background:${m.color}"></span><span style="flex:1;font-size:13px">${esc(m.name)}</span><button onclick="renameTbMember('${m.id}')" title="Rename">✏</button><button onclick="removeTbMember('${m.id}')" title="Remove">×</button></div>`).join('') : `<div style="font-size:12px;color:var(--muted)">No members yet.</div>`;
   document.getElementById('tb-manage-projects').innerHTML = board.projects.length ? board.projects.map(p=>`
-    <div class="subtask-row"><span class="proj-dot" style="background:${p.color}"></span><span style="flex:1;font-size:13px">${esc(p.name)}</span><button onclick="removeTbProject('${p.id}')">×</button></div>`).join('') : `<div style="font-size:12px;color:var(--muted)">No projects yet.</div>`;
+    <div class="subtask-row"><span class="proj-dot" style="background:${p.color}"></span><span style="flex:1;font-size:13px">${esc(p.name)}</span><button onclick="renameTbProject('${p.id}')" title="Rename">✏</button><button onclick="removeTbProject('${p.id}')" title="Remove">×</button></div>`).join('') : `<div style="font-size:12px;color:var(--muted)">No projects yet.</div>`;
+}
+async function renameTbMember(id){
+  const board=activeTeamBoard(); const m=tbMemberById(board,id); if(!m) return;
+  const name=prompt('Rename member',m.name); if(!name||!name.trim()||name.trim()===m.name) return;
+  await fetch(`${API}/teamboards/${board.id}/members/${id}`,{method:'PATCH',body:JSON.stringify({name:name.trim()}),headers:{'Content-Type':'application/json'}});
+  await load(); renderManageTeamModal(); toast('Member renamed');
+}
+async function renameTbProject(id){
+  const board=activeTeamBoard(); const p=tbProjectById(board,id); if(!p) return;
+  const name=prompt('Rename project',p.name); if(!name||!name.trim()||name.trim()===p.name) return;
+  await fetch(`${API}/teamboards/${board.id}/projects/${id}`,{method:'PATCH',body:JSON.stringify({name:name.trim()}),headers:{'Content-Type':'application/json'}});
+  await load(); renderManageTeamModal(); toast('Project renamed');
 }
 async function addTbMember(){
   const input=document.getElementById('tb-new-member');
@@ -2771,7 +2791,21 @@ async function removeTbProject(id){
   await load(); renderManageTeamModal(); toast('Project deleted');
 }
 
-// ── Team task edit modal ───────────────────────────
+// ── Team task modal (create + edit) ────────────────
+function openNewTbTaskModal(){
+  const board=activeTeamBoard();
+  if(!board){ toast('Create a team board first'); return }
+  editingTbTaskId=null;
+  document.getElementById('tbt-title').textContent='New Task';
+  document.getElementById('tbt-text').value='';
+  document.getElementById('tbt-status').innerHTML=board.columns.map((c,i)=>`<option value="${c.id}" ${i===0?'selected':''}>${esc(c.name)}</option>`).join('');
+  document.getElementById('tbt-assignee').innerHTML='<option value="">Unassigned</option>'+board.members.map(m=>`<option value="${m.id}" ${tbAssigneeFilter===m.id?'selected':''}>${esc(m.name)}</option>`).join('');
+  document.getElementById('tbt-due').value='';
+  document.getElementById('tbt-notes').value='';
+  document.getElementById('tbt-proj-list').innerHTML=board.projects.length ? board.projects.map(p=>`
+    <label class="proj-check-item"><input type="checkbox" value="${p.id}" ${tbProjFilter===p.id?'checked':''}/><span class="proj-dot" style="background:${p.color}"></span>${esc(p.name)}</label>`).join('') : `<div style="font-size:12px;color:var(--muted)">No projects yet — add one via Manage Team.</div>`;
+  openModal('modal-tb-task');
+}
 function openEditTbTask(id){
   const board=activeTeamBoard(); const t=board.tasks.find(x=>x.id===id); if(!t) return;
   editingTbTaskId=id;
@@ -2793,9 +2827,14 @@ async function saveTbTask(){
   const due=document.getElementById('tbt-due').value;
   const notes=document.getElementById('tbt-notes').value.trim();
   const projectIds=[...document.querySelectorAll('#tbt-proj-list input:checked')].map(c=>c.value);
-  await fetch(`${API}/teamboards/${board.id}/tasks/${editingTbTaskId}`,{method:'PATCH',body:JSON.stringify({text,status,assigneeId,dueDate:due||null,notes:notes||null,projectIds}),headers:{'Content-Type':'application/json'}});
+  const payload={text,status,assigneeId,dueDate:due||null,notes:notes||null,projectIds};
+  if(editingTbTaskId){
+    await fetch(`${API}/teamboards/${board.id}/tasks/${editingTbTaskId}`,{method:'PATCH',body:JSON.stringify(payload),headers:{'Content-Type':'application/json'}});
+  } else {
+    await fetch(`${API}/teamboards/${board.id}/tasks`,{method:'POST',body:JSON.stringify(payload),headers:{'Content-Type':'application/json'}});
+  }
   closeModal('modal-tb-task');
-  await load(); toast('Saved');
+  await load(); toast(editingTbTaskId?'Saved':'Task added');
 }
 async function confirmDelTbTask(id){
   if(!confirm('Delete this task?')) return;
