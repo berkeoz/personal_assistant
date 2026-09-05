@@ -623,6 +623,11 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
     <div id="habits-overview">
       <div class="hb-toolbar">
         <button class="btn btn-primary btn-sm" onclick="openNewHabitModal()">＋ New Habit</button>
+        <span style="flex:1"></span>
+        <button class="btn btn-ghost btn-sm" onclick="hbGridNav(1)" title="Older">‹</button>
+        <span id="hb-grid-range" style="font-size:12px;min-width:120px;text-align:center;color:var(--muted)"></span>
+        <button class="btn btn-ghost btn-sm" onclick="hbGridNav(-1)" title="Newer">›</button>
+        <button class="btn btn-ghost btn-sm" onclick="hbGridToday()">Today</button>
       </div>
       <div class="hb-grid-wrap" id="hb-grid-wrap"></div>
     </div>
@@ -962,7 +967,7 @@ const mpickState = {};
 let mmActiveId = null, mmSelectedNodeId = null, mmSelectedEdgeId = null;
 // Habit state
 let habitColor = COLORS[0], habitScheduleType = 'daily', habitScheduleDays = new Set([1,2,3,4,5]);
-let editingHabitId = null, activeHabitId = null;
+let editingHabitId = null, activeHabitId = null, hbGridOffset = 0;
 let hbCalYear = new Date().getFullYear(), hbCalMonth = new Date().getMonth();
 // Team board state
 let tbActiveId = null, tbHiddenCols = new Set(), tbProjFilter = null, tbAssigneeFilter = null, tbView = 'board';
@@ -2406,19 +2411,29 @@ function renderHabits(){
 function adherenceTier(pct){ return pct>=100?'perfect':pct>=80?'great':'poor' }
 function adherenceLabel(pct){ return pct>=100?'Perfect':pct>=80?'Great':'Needs work' }
 
+// The overview grid shows a rolling HB_DAYS-wide window rather than a
+// habit's whole history (which can run for months/years) — hbGridOffset
+// pages that window back in whole-window steps; 0 always means "the most
+// recent window, ending today" and can't go past today into the future.
 function renderHabitsGrid(){
   const wrap=document.getElementById('hb-grid-wrap');
-  if(!data.habits.length){ wrap.innerHTML='<div class="empty">No habits yet. Add one to start tracking.</div>'; return }
+  if(!data.habits.length){ wrap.innerHTML='<div class="empty">No habits yet. Add one to start tracking.</div>'; document.getElementById('hb-grid-range').textContent=''; return }
   const today=new Date(); today.setHours(0,0,0,0);
+  const anchor=new Date(today); anchor.setDate(anchor.getDate()-hbGridOffset*HB_DAYS);
   const days=[];
-  for(let i=HB_DAYS-1;i>=0;i--){ const d=new Date(today); d.setDate(d.getDate()-i); days.push(d); }
+  for(let i=HB_DAYS-1;i>=0;i--){ const d=new Date(anchor); d.setDate(d.getDate()-i); days.push(d); }
+  const mo=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const fmt=d=>`${mo[d.getMonth()]} ${d.getDate()}`;
+  document.getElementById('hb-grid-range').textContent = hbGridOffset===0 ? `${fmt(days[0])} – Today` : `${fmt(days[0])} – ${fmt(days[days.length-1])}`;
   const dow=['S','M','T','W','T','F','S'];
   const head=`<tr><th></th><th></th><th></th>${days.map(d=>`<th>${dow[d.getDay()]}<br>${d.getDate()}</th>`).join('')}</tr>`;
   const rows=data.habits.map(h=>{
     const st=habitStats(h);
     const tier=adherenceTier(st.monthPct);
     return `<tr>
-      <td class="hb-row-name" onclick="openHabitDetail('${h.id}')"><span class="proj-dot" style="background:${h.color};margin-right:6px"></span>${esc(h.name)}</td>
+      <td class="hb-row-name" onclick="openHabitDetail('${h.id}')"><span class="proj-dot" style="background:${h.color};margin-right:6px"></span>${esc(h.name)}
+        <button class="btn btn-ghost btn-sm" style="padding:1px 6px" title="Rename" onclick="event.stopPropagation();openEditHabitModal('${h.id}')">✏</button>
+      </td>
       <td><span class="hb-status ${st.status}">${st.label}</span></td>
       <td><span class="hb-pct ${tier}" title="${adherenceLabel(st.monthPct)} this month">${st.monthPct}%</span></td>
       ${days.map(d=>{
@@ -2437,6 +2452,8 @@ function renderHabitsGrid(){
   }).join('');
   wrap.innerHTML=`<table class="hb-grid"><thead>${head}</thead><tbody>${rows}</tbody></table>`;
 }
+function hbGridNav(dir){ hbGridOffset=Math.max(0,hbGridOffset+dir); renderHabitsGrid(); }
+function hbGridToday(){ hbGridOffset=0; renderHabitsGrid(); }
 
 async function toggleHabitDay(id, iso){
   await fetch(`${API}/habits/${id}/toggle`,{method:'POST',body:JSON.stringify({date:iso}),headers:{'Content-Type':'application/json'}});
@@ -2536,8 +2553,8 @@ function openNewHabitModal(){
   buildWeekdayPicker();
   openModal('modal-habit');
 }
-function openEditHabitModal(){
-  const h=habitById(activeHabitId); if(!h) return;
+function openEditHabitModal(id){
+  const h=habitById(id||activeHabitId); if(!h) return;
   editingHabitId=h.id;
   document.getElementById('mh-title').textContent='Edit Habit';
   document.getElementById('mh-name').value=h.name;
