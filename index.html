@@ -1418,14 +1418,14 @@ function renderSchedule(){
   const now=new Date();
   const tasks=data.tasks.filter(t=>t.dueDate).sort((a,b)=>new Date(a.dueDate)-new Date(b.dueDate));
   const overdue=tasks.filter(t=>isOverdue(t));
-  const today=tasks.filter(t=>isToday(t)&&t.status!=='done');
-  const upcoming=tasks.filter(t=>!isOverdue(t)&&!isToday(t)&&t.status!=='done');
-  const done=tasks.filter(t=>t.status==='done');
+  const today=tasks.filter(t=>isToday(t)&&!isCompleted(t));
+  const upcoming=tasks.filter(t=>!isOverdue(t)&&!isToday(t)&&!isCompleted(t));
+  const done=tasks.filter(t=>isCompleted(t));
   function sec(label,cls,color,items){
     if(!items.length) return '';
     return `<div class="schedule-section"><div class="schedule-label" style="color:${color}">${label} (${items.length})</div>
-      ${items.map(t=>`<div class="schedule-item ${cls} ${t.status==='done'?'done':''}">
-        <input class="task-cb" type="checkbox" ${t.status==='done'?'checked':''} onchange="toggleTask('${t.id}')"/>
+      ${items.map(t=>`<div class="schedule-item ${cls} ${isCompleted(t)?'done':''}">
+        <input class="task-cb" type="checkbox" ${isCompleted(t)?'checked':''} onchange="toggleTask('${t.id}')"/>
         <span class="si-text">${esc(t.text)}</span>
         ${taskProjects(t).map(p=>`<span class="proj-tag" style="background:${p.color}">${esc(p.name)}</span>`).join('')}
         <span class="si-date ${cls}">${fmtDatetime(t.dueDate)}</span>
