@@ -303,6 +303,42 @@ export default async function handler(req, res) {
       return methodNotAllowed("PATCH, DELETE");
     }
 
+    // ── /api/diary ───────────────────────────────────
+    // Free-text log entries tied to a specific calendar date (not tasks —
+    // just "what I did"). The Diary view groups them by week, and an
+    // Insights mode aggregates across every week by weekday name so
+    // patterns show up over time.
+    if (resource === "diary") {
+      const data = await loadData();
+      if (!id) {
+        if (req.method !== "POST") return methodNotAllowed("POST");
+        const entry = {
+          id: crypto.randomUUID(),
+          date: (body && body.date) || new Date().toISOString().slice(0, 10),
+          time: (body && body.time) || null,
+          text: (body && body.text) || "",
+          createdAt: new Date().toISOString(),
+        };
+        data.diary.push(entry);
+        await saveData(data);
+        return ok(entry);
+      }
+      const entry = data.diary.find((d) => d.id === id);
+      if (req.method === "PATCH") {
+        if (!entry) return notFound();
+        Object.assign(entry, body);
+        await saveData(data);
+        return ok(entry);
+      }
+      if (req.method === "DELETE") {
+        if (!entry) return notFound();
+        data.diary = data.diary.filter((d) => d.id !== id);
+        await saveData(data);
+        return noContent();
+      }
+      return methodNotAllowed("PATCH, DELETE");
+    }
+
     // ── /api/settings ──────────────────────────────
     // A small free-form bag for UI preferences that should sync across
     // devices (e.g. which Kanban columns are hidden) — PATCH merges keys in.

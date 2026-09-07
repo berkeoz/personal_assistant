@@ -389,6 +389,20 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
 .week-task .wt-proj{font-size:10px;color:var(--muted);margin-top:3px}
 .week-empty{font-size:11px;color:var(--surface3);text-align:center;padding:12px 0}
 
+/* Diary */
+.diary-entry{background:var(--surface2);border-radius:6px;padding:6px 8px;font-size:12px;display:flex;align-items:flex-start;gap:6px}
+.diary-entry-text{flex:1;cursor:pointer;word-break:break-word}
+.diary-entry-text:hover{color:var(--accent)}
+.diary-entry-text b{color:var(--accent2);font-weight:600}
+.diary-add-row{padding:0 8px 8px}
+.diary-add-row input{width:100%;background:var(--surface3);border:1px solid var(--border);border-radius:6px;padding:6px 9px;color:var(--text);font-size:12px;outline:none}
+.diary-add-row input:focus{border-color:var(--accent)}
+.diary-insight-list{padding:8px;display:flex;flex-direction:column;gap:4px}
+.diary-insight-item{display:flex;justify-content:space-between;gap:8px;font-size:12px;background:var(--surface2);border-radius:6px;padding:6px 9px}
+.diary-insight-item span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.diary-insight-count{color:var(--muted);flex-shrink:0}
+#diary-insights-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+
 /* Calendar connection items in sidebar */
 .cal-conn-item{display:flex;align-items:center;gap:7px;padding:6px 10px;border-radius:8px;font-size:12px;color:var(--muted)}
 .cal-conn-item:hover{background:var(--surface2)}
@@ -438,6 +452,7 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
   <button class="nav-btn" onclick="switchView('summary',this)" data-view="summary"><span class="ic">📊</span> Summary</button>
   <button class="nav-btn" onclick="switchView('mindmap',this)" data-view="mindmap"><span class="ic">🧠</span> Mind Map</button>
   <button class="nav-btn" onclick="switchView('habits',this)" data-view="habits"><span class="ic">🔁</span> Habits</button>
+  <button class="nav-btn" onclick="switchView('diary',this)" data-view="diary"><span class="ic">📔</span> Diary</button>
   <button class="nav-btn" onclick="switchView('history',this)" data-view="history"><span class="ic">🕘</span> History</button>
   <button class="nav-btn" onclick="switchView('teams',this)" data-view="teams"><span class="ic">👥</span> Teams</button>
   <button class="nav-btn" onclick="openImportModal()" style="color:var(--accent2)"><span class="ic">📥</span> Import .ics</button>
@@ -605,6 +620,23 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
       <button class="week-today-btn" onclick="weekGoToday()">This Week</button>
     </div>
     <div class="week-grid" id="week-grid"></div>
+  </div>
+
+  <!-- Diary -->
+  <div class="view" id="view-diary">
+    <div class="week-header" id="diary-header">
+      <span id="diary-week-nav" style="display:flex;align-items:center;gap:10px">
+        <button class="week-nav" onclick="diaryNav(-1)">‹</button>
+        <h3 id="diary-title"></h3>
+        <button class="week-nav" onclick="diaryNav(1)">›</button>
+        <button class="week-today-btn" onclick="diaryGoToday()">This Week</button>
+      </span>
+      <span id="diary-insights-title" style="display:none;font-weight:600;font-size:15px">📊 What I generally do, by day of week</span>
+      <span style="flex:1"></span>
+      <button class="btn btn-ghost btn-sm" id="diary-insights-btn" onclick="toggleDiaryInsights()">📊 Insights</button>
+    </div>
+    <div class="week-grid" id="diary-grid"></div>
+    <div id="diary-insights" style="display:none"></div>
   </div>
 
   <!-- Search -->
@@ -1026,7 +1058,7 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
 <script>
 const API = '/api';
 const COLORS = ['#6c8eff','#a78bfa','#34d399','#fbbf24','#f87171','#fb923c','#38bdf8','#f472b6','#94a3b8'];
-let data = { columns: [], projects: [], tasks: [], mindmaps: [], habits: [], recurringEvents: [] };
+let data = { columns: [], projects: [], tasks: [], mindmaps: [], habits: [], recurringEvents: [], diary: [] };
 let listFilters = new Set(), kbProjFilter = null, pdFilter = 'all', pdProjectId = null;
 let hiddenCols = new Set();   // column IDs hidden in kanban
 let dragColId = null;         // column being dragged (for reorder)
@@ -1137,6 +1169,7 @@ async function load(){
   if(!data.settings) data.settings={};
   if(!data.teamBoards) data.teamBoards=[];
   if(!data.recurringEvents) data.recurringEvents=[];
+  if(!data.diary) data.diary=[];
   hiddenCols = new Set(data.settings.kanbanHiddenCols||[]);
   renderAll();
 }
@@ -1188,6 +1221,7 @@ function renderView(name){
   else if(name==='summary') renderSummary();
   else if(name==='mindmap') renderMindMap();
   else if(name==='habits') renderHabits();
+  else if(name==='diary') renderDiary();
   else if(name==='history') renderHistory();
   else if(name==='teams') renderTeams();
 }
@@ -2035,6 +2069,110 @@ function renderWeek(){
       </div>
     </div>`;
   }).join('');
+}
+
+// ── Diary ──────────────────────────────────────
+// A free-text log of "what I did" per calendar day — deliberately not
+// tasks (no status, nothing to complete). The week grid is for writing
+// entries down as you go; Insights aggregates every entry ever logged,
+// grouped by weekday name, so patterns ("what do I usually do on
+// Mondays?") emerge once enough weeks have piled up.
+let diaryWeekOffset=0, diaryInsightsOn=false;
+function diaryWeekStart(offset=0){
+  const d=new Date(); d.setHours(0,0,0,0);
+  const day=d.getDay();
+  d.setDate(d.getDate()-day+1+(offset*7)); // Monday start, same as Week view
+  return d;
+}
+function diaryNav(dir){ diaryWeekOffset+=dir; renderDiary(); }
+function diaryGoToday(){ diaryWeekOffset=0; renderDiary(); }
+function diaryEntriesOn(dateStr){
+  return data.diary.filter(e=>e.date===dateStr)
+    .sort((a,b)=>(a.time||'99:99').localeCompare(b.time||'99:99')||(a.createdAt||'').localeCompare(b.createdAt||''));
+}
+function toggleDiaryInsights(){
+  diaryInsightsOn=!diaryInsightsOn;
+  document.getElementById('diary-insights-btn').classList.toggle('active',diaryInsightsOn);
+  document.getElementById('diary-week-nav').style.display=diaryInsightsOn?'none':'flex';
+  document.getElementById('diary-insights-title').style.display=diaryInsightsOn?'':'none';
+  document.getElementById('diary-grid').style.display=diaryInsightsOn?'none':'';
+  document.getElementById('diary-insights').style.display=diaryInsightsOn?'':'none';
+  renderDiary();
+}
+function renderDiary(){
+  if(diaryInsightsOn){ renderDiaryInsights(); return; }
+  const mon=diaryWeekStart(diaryWeekOffset);
+  const sun=new Date(mon); sun.setDate(sun.getDate()+6);
+  document.getElementById('diary-title').textContent=
+    mon.toLocaleDateString('en-US',{month:'short',day:'numeric'})+' – '+
+    sun.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+  const todayStr=new Date().toISOString().slice(0,10);
+  const dayNames=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  document.getElementById('diary-grid').innerHTML=dayNames.map((dayName,i)=>{
+    const d=new Date(mon); d.setDate(d.getDate()+i);
+    const dateStr=d.toISOString().slice(0,10);
+    const entries=diaryEntriesOn(dateStr);
+    const isToday=dateStr===todayStr;
+    return `<div class="week-col ${isToday?'is-today':''}">
+      <div class="week-col-header">
+        <div class="week-col-day">${dayName}</div>
+        <div class="week-col-date">${d.getDate()}</div>
+      </div>
+      <div class="week-col-tasks">
+        ${entries.length?entries.map(e=>`
+          <div class="diary-entry">
+            <span class="diary-entry-text" onclick="editDiaryEntry('${e.id}')" title="Click to edit">${e.time?`<b>${fmtTimeOnly(e.time)}</b> `:''}${esc(e.text)}</span>
+            <button class="task-del" onclick="deleteDiaryEntry('${e.id}')">×</button>
+          </div>`).join(''):`<div class="week-empty">—</div>`}
+      </div>
+      <div class="diary-add-row"><input type="text" placeholder="What did you do…" onkeydown="diaryQuickAdd(event,'${dateStr}')"/></div>
+    </div>`;
+  }).join('');
+}
+async function diaryQuickAdd(e,dateStr){
+  if(e.key!=='Enter') return;
+  const text=e.target.value.trim(); if(!text) return;
+  await fetch(`${API}/diary`,{method:'POST',body:JSON.stringify({date:dateStr,text}),headers:{'Content-Type':'application/json'}});
+  e.target.value='';
+  await load();
+}
+async function deleteDiaryEntry(id){
+  await fetch(`${API}/diary/${id}`,{method:'DELETE'});
+  await load();
+}
+async function editDiaryEntry(id){
+  const entry=data.diary.find(e=>e.id===id); if(!entry) return;
+  const text=prompt('Edit entry', entry.text);
+  if(text===null) return;
+  const trimmed=text.trim();
+  if(!trimmed){ toast('Entry text cannot be empty'); return }
+  await fetch(`${API}/diary/${id}`,{method:'PATCH',body:JSON.stringify({text:trimmed}),headers:{'Content-Type':'application/json'}});
+  await load();
+}
+function renderDiaryInsights(){
+  const wrap=document.getElementById('diary-insights');
+  if(!data.diary.length){ wrap.innerHTML='<div class="empty">No diary entries yet — log a few days and check back here.</div>'; return }
+  const dayNames=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const byDay=Array.from({length:7},()=>({total:0,counts:{}}));
+  data.diary.forEach(e=>{
+    const d=parseDate(e.date); if(!d) return;
+    const dow=d.getDay();
+    byDay[dow].total++;
+    const key=(e.text||'').trim().toLowerCase();
+    if(!key) return;
+    byDay[dow].counts[key]=(byDay[dow].counts[key]||0)+1;
+  });
+  const order=[1,2,3,4,5,6,0]; // Mon..Sun, matching the rest of the app
+  wrap.innerHTML=`<div class="week-grid">${order.map(dow=>{
+    const info=byDay[dow];
+    const top=Object.entries(info.counts).sort((a,b)=>b[1]-a[1]).slice(0,10);
+    return `<div class="week-col">
+      <div class="week-col-header"><div class="week-col-day">${dayNames[dow]}</div><div class="week-col-date">${info.total}</div></div>
+      ${top.length?`<div class="diary-insight-list">${top.map(([text,count])=>`
+        <div class="diary-insight-item" title="${esc(text)}"><span>${esc(text)}</span><span class="diary-insight-count">${count}×</span></div>`).join('')}</div>`
+        : `<div class="week-empty">No entries yet</div>`}
+    </div>`;
+  }).join('')}</div>`;
 }
 
 // ── ICS Import ─────────────────────────────────
