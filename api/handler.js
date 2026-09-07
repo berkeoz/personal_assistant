@@ -267,9 +267,10 @@ export default async function handler(req, res) {
     }
 
     // ── /api/events ──────────────────────────────────
-    // Recurring calendar events — shown on the Calendar/Today/Week views
+    // Calendar events — one-time (recurrence.type "once", with a "date") or
+    // repeating daily/weekly/monthly. Shown on the Calendar/Today/Week views
     // but deliberately NOT tasks (no status, no checkbox, don't count
-    // toward task stats). Recurrence mirrors the habit schedule shape.
+    // toward task stats).
     if (resource === "events") {
       const data = await loadData();
       if (!id) {
@@ -278,6 +279,7 @@ export default async function handler(req, res) {
           id: crypto.randomUUID(),
           text: (body && body.text) || "Untitled Event",
           time: (body && body.time) || null,
+          endTime: (body && body.endTime) || null,
           color: (body && body.color) || "#6c8eff",
           recurrence: (body && body.recurrence) || { type: "daily" },
         };

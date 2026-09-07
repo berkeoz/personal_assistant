@@ -516,7 +516,7 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
           <h3 id="cal-title"></h3>
           <button class="cal-nav" onclick="calNav(1)">›</button>
           <button class="cal-today-btn" onclick="calGoToday()">Today</button>
-          <button class="btn btn-ghost btn-sm" onclick="openRecurManageModal()">🔁 Recurring Events</button>
+          <button class="btn btn-ghost btn-sm" onclick="openRecurManageModal()">📅 Events</button>
         </div>
         <div class="cal-day-names">
           <div class="cal-day-name">Sun</div><div class="cal-day-name">Mon</div>
@@ -622,6 +622,7 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
       <span style="flex:1"></span>
       <button class="btn btn-ghost btn-sm" onclick="addMmNode('circle')">◯ Circle</button>
       <button class="btn btn-ghost btn-sm" onclick="addMmNode('rect')">▭ Rectangle</button>
+      <button class="btn btn-ghost btn-sm" onclick="mmSelectAll()" title="Select every shape (Ctrl/Cmd+A)">☑ Select All</button>
       <button class="btn btn-ghost btn-sm" id="mm-copy-btn" onclick="mmCopySelection()" title="Shift-click shapes to select several" style="display:none">⧉ Copy</button>
       <button class="btn btn-ghost btn-sm" onclick="mmPasteClipboard()" title="Paste here — works across different maps too">📋 Paste</button>
       <button class="btn btn-ghost btn-sm" id="mm-arrow-btn" onclick="cycleMmEdgeArrow()" style="display:none">Arrow: None</button>
@@ -878,31 +879,34 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
   </div>
 </div>
 
-<!-- Modal: Manage Recurring Events -->
+<!-- Modal: Manage Calendar Events -->
 <div class="modal-overlay" id="modal-recur-manage">
   <div class="modal">
-    <h3>Recurring Events</h3>
+    <h3>Calendar Events</h3>
     <div id="recur-manage-list" class="subtask-editor"></div>
     <div class="modal-actions" style="justify-content:space-between">
-      <button class="btn btn-primary btn-sm" onclick="openNewRecurModal()">＋ Add Recurring Event</button>
+      <button class="btn btn-primary btn-sm" onclick="openNewRecurModal()">＋ Add Event</button>
       <button class="btn btn-ghost" onclick="closeModal('modal-recur-manage')">Close</button>
     </div>
   </div>
 </div>
 
-<!-- Modal: New/Edit Recurring Event -->
+<!-- Modal: New/Edit Calendar Event (one-time or recurring) -->
 <div class="modal-overlay" id="modal-recur">
   <div class="modal">
-    <h3 id="rev-title">New Recurring Event</h3>
-    <div class="field"><label>Name</label><input id="rev-name" placeholder="e.g. Team standup, Rent due, Gym…"/></div>
-    <div class="field"><label>Time (optional)</label><input id="rev-time" type="time" style="max-width:150px"/></div>
-    <div class="field"><label>Color</label><div class="color-row" id="rev-color-row"></div></div>
-    <div class="field"><label>Repeats</label>
+    <h3 id="rev-title">New Event</h3>
+    <div class="field"><label>Name</label><input id="rev-name" placeholder="e.g. Team standup, Rent due, Dentist…"/></div>
+    <div class="field"><label>When</label>
       <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
-        <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="radio" name="rev-sched" value="daily" checked onchange="setRevScheduleType('daily')"/> Every day</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="radio" name="rev-sched" value="once" checked onchange="setRevScheduleType('once')"/> Just this day</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="radio" name="rev-sched" value="daily" onchange="setRevScheduleType('daily')"/> Every day</label>
         <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="radio" name="rev-sched" value="weekly" onchange="setRevScheduleType('weekly')"/> Specific days</label>
         <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="radio" name="rev-sched" value="monthly" onchange="setRevScheduleType('monthly')"/> Monthly</label>
       </div>
+    </div>
+    <div class="field" id="rev-once-field">
+      <label>Date</label>
+      <input id="rev-once-date" type="date" style="max-width:170px"/>
     </div>
     <div class="field" id="rev-weekday-field" style="display:none">
       <label>Days</label>
@@ -912,6 +916,14 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
       <label>Day of month</label>
       <input id="rev-monthday" type="number" min="1" max="31" value="1" style="max-width:100px"/>
     </div>
+    <div class="field"><label>Time (optional)</label>
+      <div style="display:flex;gap:10px;align-items:center">
+        <input id="rev-time" type="time" style="max-width:150px"/>
+        <span style="color:var(--muted);font-size:12px">to</span>
+        <input id="rev-end-time" type="time" style="max-width:150px"/>
+      </div>
+    </div>
+    <div class="field"><label>Color</label><div class="color-row" id="rev-color-row"></div></div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeModal('modal-recur');openRecurManageModal()">Cancel</button>
       <button class="btn btn-primary" onclick="saveRecurModal()">Save</button>
@@ -1525,6 +1537,7 @@ document.getElementById('sc-text').addEventListener('keydown',e=>{ if(e.key==='E
 // your tasks without them cluttering the task lists.
 function isEventScheduledOn(ev, dateObj){
   const r=ev.recurrence||{type:'daily'};
+  if(r.type==='once') return r.date===isoDate(dateObj);
   if(r.type==='weekly') return (r.days||[]).includes(dateObj.getDay());
   if(r.type==='monthly') return dateObj.getDate()===(r.day||1);
   return true; // daily
@@ -1533,6 +1546,10 @@ function eventsOnDate(dateObj){ return data.recurringEvents.filter(ev=>isEventSc
 function eventsOnDateStr(dateStr){ return eventsOnDate(new Date(dateStr+'T00:00:00')); }
 function recurSummary(ev){
   const r=ev.recurrence||{type:'daily'};
+  if(r.type==='once'){
+    if(!r.date) return 'One-time';
+    return parseDate(r.date).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+  }
   if(r.type==='weekly'){
     const names=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
     return [...(r.days||[])].sort().map(d=>names[d]).join(', ')||'Weekly';
@@ -1545,8 +1562,14 @@ function fmtTimeOnly(hhmm){
   const d=new Date(); d.setHours(h,m,0,0);
   return d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
 }
+// Shows "9:00 AM" for a single time, "9:00 – 10:00 AM" for a range.
+function fmtEventTime(ev){
+  if(!ev.time) return '';
+  return ev.endTime ? `${fmtTimeOnly(ev.time)} – ${fmtTimeOnly(ev.endTime)}` : fmtTimeOnly(ev.time);
+}
+function eventIcon(ev){ return (ev.recurrence?.type||'daily')==='once' ? '📅' : '🔁'; }
 
-let revScheduleType='daily', revScheduleDays=new Set([1,2,3,4,5]), revColor=COLORS[0], editingRecurId=null;
+let revScheduleType='once', revScheduleDays=new Set([1,2,3,4,5]), revColor=COLORS[0], editingRecurId=null;
 function buildRevWeekdayPicker(){
   const wrap=document.getElementById('rev-weekday-picker');
   const names=['S','M','T','W','T','F','S'];
@@ -1558,6 +1581,7 @@ function toggleRevWeekday(i,el){
 }
 function setRevScheduleType(type){
   revScheduleType=type;
+  document.getElementById('rev-once-field').style.display = type==='once'?'':'none';
   document.getElementById('rev-weekday-field').style.display = type==='weekly'?'':'none';
   document.getElementById('rev-monthday-field').style.display = type==='monthly'?'':'none';
 }
@@ -1566,11 +1590,11 @@ function selectRevColor(c,el){ revColor=c; document.querySelectorAll('#rev-color
 function openRecurManageModal(){ renderRecurManageList(); openModal('modal-recur-manage'); }
 function renderRecurManageList(){
   const wrap=document.getElementById('recur-manage-list');
-  if(!data.recurringEvents.length){ wrap.innerHTML='<div style="font-size:12px;color:var(--muted)">No recurring events yet.</div>'; return }
+  if(!data.recurringEvents.length){ wrap.innerHTML='<div style="font-size:12px;color:var(--muted)">No events yet.</div>'; return }
   wrap.innerHTML=data.recurringEvents.map(ev=>`
     <div class="subtask-row">
       <span class="proj-dot" style="background:${ev.color}"></span>
-      <span style="flex:1;font-size:13px">${esc(ev.text)}${ev.time?` <span style="color:var(--muted);font-size:11px">${fmtTimeOnly(ev.time)}</span>`:''}
+      <span style="flex:1;font-size:13px">${esc(ev.text)}${ev.time?` <span style="color:var(--muted);font-size:11px">${fmtEventTime(ev)}</span>`:''}
         <div style="font-size:11px;color:var(--muted)">${recurSummary(ev)}</div>
       </span>
       <button onclick="openEditRecurModal('${ev.id}')" title="Edit">✏</button>
@@ -1579,12 +1603,15 @@ function renderRecurManageList(){
 }
 function openNewRecurModal(){
   editingRecurId=null;
-  document.getElementById('rev-title').textContent='New Recurring Event';
+  document.getElementById('rev-title').textContent='New Event';
   document.getElementById('rev-name').value='';
   document.getElementById('rev-time').value='';
+  document.getElementById('rev-end-time').value='';
   revColor=COLORS[data.recurringEvents.length % COLORS.length];
-  revScheduleType='daily'; revScheduleDays=new Set([1,2,3,4,5]);
-  document.querySelector('input[name="rev-sched"][value="daily"]').checked=true;
+  revScheduleType='once'; revScheduleDays=new Set([1,2,3,4,5]);
+  document.querySelector('input[name="rev-sched"][value="once"]').checked=true;
+  // Default to whichever day is already selected on the Calendar, if any.
+  document.getElementById('rev-once-date').value = calSelectedDate || new Date().toISOString().slice(0,10);
   document.getElementById('rev-weekday-field').style.display='none';
   document.getElementById('rev-monthday-field').style.display='none';
   document.getElementById('rev-monthday').value=1;
@@ -1596,14 +1623,17 @@ function openNewRecurModal(){
 function openEditRecurModal(id){
   const ev=data.recurringEvents.find(e=>e.id===id); if(!ev) return;
   editingRecurId=ev.id;
-  document.getElementById('rev-title').textContent='Edit Recurring Event';
+  document.getElementById('rev-title').textContent='Edit Event';
   document.getElementById('rev-name').value=ev.text;
   document.getElementById('rev-time').value=ev.time||'';
+  document.getElementById('rev-end-time').value=ev.endTime||'';
   revColor=ev.color;
   const r=ev.recurrence||{type:'daily'};
   revScheduleType=r.type;
   revScheduleDays=new Set(r.days||[1,2,3,4,5]);
   document.querySelector(`input[name="rev-sched"][value="${revScheduleType}"]`).checked=true;
+  document.getElementById('rev-once-date').value = r.date || new Date().toISOString().slice(0,10);
+  document.getElementById('rev-once-field').style.display = revScheduleType==='once'?'':'none';
   document.getElementById('rev-weekday-field').style.display = revScheduleType==='weekly'?'':'none';
   document.getElementById('rev-monthday-field').style.display = revScheduleType==='monthly'?'':'none';
   document.getElementById('rev-monthday').value=r.day||1;
@@ -1616,14 +1646,19 @@ async function saveRecurModal(){
   const text=document.getElementById('rev-name').value.trim();
   if(!text){ toast('Enter an event name'); return }
   const time=document.getElementById('rev-time').value || null;
+  const endTime=document.getElementById('rev-end-time').value || null;
   let recurrence;
-  if(revScheduleType==='weekly') recurrence={ type:'weekly', days:[...revScheduleDays].sort() };
+  if(revScheduleType==='once'){
+    const date=document.getElementById('rev-once-date').value;
+    if(!date){ toast('Pick a date'); return }
+    recurrence={ type:'once', date };
+  } else if(revScheduleType==='weekly') recurrence={ type:'weekly', days:[...revScheduleDays].sort() };
   else if(revScheduleType==='monthly'){
     const day=Math.max(1,Math.min(31,parseInt(document.getElementById('rev-monthday').value,10)||1));
     recurrence={ type:'monthly', day };
   } else recurrence={ type:'daily' };
   if(recurrence.type==='weekly' && recurrence.days.length===0){ toast('Pick at least one day'); return }
-  const body={ text, time, color:revColor, recurrence };
+  const body={ text, time, endTime, color:revColor, recurrence };
   if(editingRecurId){
     await fetch(`${API}/events/${editingRecurId}`,{method:'PATCH',body:JSON.stringify(body),headers:{'Content-Type':'application/json'}});
   } else {
@@ -1636,7 +1671,7 @@ async function saveRecurModal(){
 }
 async function deleteRecurEvent(id){
   const ev=data.recurringEvents.find(e=>e.id===id);
-  if(!confirm(`Delete recurring event "${ev?.text}"?`)) return;
+  if(!confirm(`Delete event "${ev?.text}"?`)) return;
   await fetch(`${API}/events/${id}`,{method:'DELETE'});
   await load();
   renderRecurManageList();
@@ -1664,7 +1699,7 @@ function renderCalendar(){
       const p=findProject((t.projectIds||[])[0]);
       return `<div class="cal-dot ${t.status==='done'?'done':isOverdue(t)?'overdue':''}" style="background:${p?.color||'var(--accent)'}">${esc(t.text)}</div>`;
     }).join('');
-    const eventDots=dayEvents.slice(0,3).map(ev=>`<div class="cal-dot recur-dot" style="background:${ev.color}">🔁 ${esc(ev.text)}</div>`).join('');
+    const eventDots=dayEvents.slice(0,3).map(ev=>`<div class="cal-dot recur-dot" style="background:${ev.color}">${eventIcon(ev)} ${esc(ev.text)}</div>`).join('');
     const shown=tasks.length+dayEvents.length;
     const more=shown>6?`<div class="cal-more">+${shown-6} more</div>`:'';
     html+=`<div class="cal-cell ${dateStr===todayStr?'today':''} ${dateStr===calSelectedDate?'selected':''}" onclick="calSelectDay('${dateStr}')">
@@ -1688,7 +1723,7 @@ function calSelectDay(dateStr){
   const eventsHtml=dayEvents.length?`<div class="cal-panel-events">${dayEvents.map(ev=>`
     <div class="cal-task recur-event-row">
       <span class="proj-dot" style="background:${ev.color}"></span>
-      <span class="cal-task-text">🔁 ${esc(ev.text)}${ev.time?` <span style="color:var(--muted)">${fmtTimeOnly(ev.time)}</span>`:''}</span>
+      <span class="cal-task-text">${eventIcon(ev)} ${esc(ev.text)}${ev.time?` <span style="color:var(--muted)">${fmtEventTime(ev)}</span>`:''}</span>
     </div>`).join('')}</div>`:'';
   document.getElementById('cal-panel-tasks').innerHTML=eventsHtml+(tasks.length?tasks.map(t=>`
     <div class="cal-task ${t.status==='done'?'done':''}">
@@ -1916,18 +1951,18 @@ function renderToday(){
       <div class="task-list">${tasks.map(taskItemHTML).join('')}</div>
     </div>`;
   }
-  // Recurring events aren't tasks — no checkbox, no status — just shown for
-  // awareness, so they get their own read-only section rather than
-  // reusing taskItemHTML.
+  // Calendar events (one-time or recurring) aren't tasks — no checkbox,
+  // no status — just shown for awareness, so they get their own read-only
+  // section rather than reusing taskItemHTML.
   function eventsSection(){
     if(!todayEvents.length) return '';
     return `<div class="today-section">
-      <div class="today-section-label" style="color:var(--accent2)">🔁 Recurring Today (${todayEvents.length})</div>
+      <div class="today-section-label" style="color:var(--accent2)">📅 Today's Events (${todayEvents.length})</div>
       <div class="task-list">${todayEvents.map(ev=>`
         <div class="task-item recur-event-row">
           <span class="proj-dot" style="background:${ev.color}"></span>
-          <span class="task-text">${esc(ev.text)}</span>
-          ${ev.time?`<span class="si-date">${fmtTimeOnly(ev.time)}</span>`:''}
+          <span class="task-text">${eventIcon(ev)} ${esc(ev.text)}</span>
+          ${ev.time?`<span class="si-date">${fmtEventTime(ev)}</span>`:''}
         </div>`).join('')}</div>
     </div>`;
   }
@@ -1984,8 +2019,8 @@ function renderWeek(){
         <div class="week-col-date">${d.getDate()}</div>
       </div>
       <div class="week-col-tasks">
-        ${dayEvents.map(ev=>`<div class="week-task recur-event-row" style="border-left-color:${ev.color}" title="Recurring event">
-            🔁 ${esc(ev.text)}${ev.time?` <span class="wt-proj">${fmtTimeOnly(ev.time)}</span>`:''}
+        ${dayEvents.map(ev=>`<div class="week-task recur-event-row" style="border-left-color:${ev.color}" title="Calendar event">
+            ${eventIcon(ev)} ${esc(ev.text)}${ev.time?` <span class="wt-proj">${fmtEventTime(ev)}</span>`:''}
           </div>`).join('')}
         ${tasks.length?tasks.map(t=>{
           const projs=taskProjects(t);
@@ -2232,6 +2267,10 @@ function mmNodeEl(n){
     if(e.pointerType==='mouse' && e.button!==0) return; // ignore right/middle mouse
     e.preventDefault();
     if(e.shiftKey){ mmToggleMultiSelect(n.id); return; }
+    // Dragging a shape that's already part of a multi-selection moves the
+    // whole group — only a click on something outside it collapses back
+    // to a plain single-select (handled below).
+    if(mmMultiSelected.has(n.id) && mmMultiSelected.size>1){ startMmMove(n.id,e); return; }
     selectMmNode(n.id);
     startMmMove(n.id,e);
   });
@@ -2266,6 +2305,14 @@ function mmToggleMultiSelect(id){
     el.classList.remove('selected');
     el.classList.toggle('multi-selected', mmMultiSelected.has(el.dataset.id));
   });
+  document.querySelectorAll('#mm-svg .mm-edge').forEach(el=>el.classList.remove('selected'));
+  updateMmDeleteBtn();
+}
+function mmSelectAll(){
+  const map=activeMindMap(); if(!map||!map.nodes.length) return;
+  mmSelectedNodeId=null; mmSelectedEdgeId=null;
+  mmMultiSelected=new Set(map.nodes.map(n=>n.id));
+  document.querySelectorAll('.mm-node').forEach(el=>{ el.classList.remove('selected'); el.classList.add('multi-selected'); });
   document.querySelectorAll('#mm-svg .mm-edge').forEach(el=>el.classList.remove('selected'));
   updateMmDeleteBtn();
 }
@@ -2329,7 +2376,12 @@ function addMmNode(shape, x, y){
 // off the element, which matters a lot more for touch than for a mouse.
 function startMmMove(id,e){
   const map=activeMindMap(); const n=map.nodes.find(x=>x.id===id); if(!n) return;
-  const startX=e.clientX, startY=e.clientY, origX=n.x, origY=n.y;
+  // If the dragged shape is part of a multi-selection, every shape in it
+  // moves together by the same delta; otherwise just this one.
+  const groupIds = (mmMultiSelected.has(id) && mmMultiSelected.size>1) ? [...mmMultiSelected] : [id];
+  const origPos={};
+  groupIds.forEach(gid=>{ const gn=map.nodes.find(x=>x.id===gid); if(gn) origPos[gid]={x:gn.x,y:gn.y}; });
+  const startX=e.clientX, startY=e.clientY;
   const el=document.querySelector(`.mm-node[data-id="${id}"]`);
   const pointerId=e.pointerId;
   try{ el.setPointerCapture(pointerId); }catch(err){}
@@ -2339,10 +2391,13 @@ function startMmMove(id,e){
     const dx=ev.clientX-startX, dy=ev.clientY-startY;
     if(!moved && Math.abs(dx)<4 && Math.abs(dy)<4) return; // ignore tiny jitter so plain clicks don't count as drags
     moved=true;
-    el.classList.add('dragging');
-    n.x=Math.max(0,Math.round(origX+dx)); n.y=Math.max(0,Math.round(origY+dy));
-    el.style.left=n.x+'px'; el.style.top=n.y+'px';
-    updateMmEdgesForNode(id);
+    groupIds.forEach(gid=>{
+      const gn=map.nodes.find(x=>x.id===gid); const orig=origPos[gid]; if(!gn||!orig) return;
+      gn.x=Math.max(0,Math.round(orig.x+dx)); gn.y=Math.max(0,Math.round(orig.y+dy));
+      const gel=document.querySelector(`.mm-node[data-id="${gid}"]`);
+      if(gel){ gel.classList.add('dragging'); gel.style.left=gn.x+'px'; gel.style.top=gn.y+'px'; }
+      updateMmEdgesForNode(gid);
+    });
     updateMmCanvasSize();
   }
   function onUp(ev){
@@ -2350,7 +2405,7 @@ function startMmMove(id,e){
     el.removeEventListener('pointermove',onMove);
     el.removeEventListener('pointerup',onUp);
     el.removeEventListener('pointercancel',onUp);
-    el.classList.remove('dragging');
+    groupIds.forEach(gid=>{ const gel=document.querySelector(`.mm-node[data-id="${gid}"]`); if(gel) gel.classList.remove('dragging'); });
     // Only save (and reload) if the node actually moved — a plain click/double-click
     // must NOT trigger a reload, or it rebuilds the node mid-gesture and breaks dblclick-to-edit.
     if(moved) saveMindMap();
@@ -2566,6 +2621,8 @@ document.addEventListener('keydown', e=>{
     e.preventDefault(); mmCopySelection();
   } else if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='v'){
     e.preventDefault(); mmPasteClipboard();
+  } else if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='a'){
+    e.preventDefault(); mmSelectAll();
   }
 });
 
