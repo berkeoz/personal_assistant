@@ -16,7 +16,13 @@
   --green:#34d399;--red:#f87171;--yellow:#fbbf24;--orange:#fb923c;
   --text:#e2e8f0;--muted:#94a3b8;--radius:10px;
 }
+/* 100vh on iOS Safari measures the viewport with the address bar hidden —
+   taller than what's actually visible when it's showing — which pushes
+   fixed-height content up under the status bar/notch. 100dvh tracks the
+   real visible area; the 100vh rule above it is just the older-browser
+   fallback (dvh support is what the @supports guards). */
 body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;font-size:14px;display:flex;height:100vh;overflow:hidden}
+@supports (height:100dvh){ body{height:100dvh} }
 
 /* Sidebar */
 .sidebar{width:230px;min-width:230px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:16px 10px;gap:2px;overflow-y:auto}
@@ -169,6 +175,9 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
 .cal-dot{font-size:10px;padding:1px 5px;border-radius:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#fff;line-height:1.4}
 .cal-dot.overdue{outline:1px solid var(--red)}
 .cal-dot.done{opacity:.45}
+.cal-dot.recur-dot{border:1px dashed #fff8}
+.recur-event-row{font-style:italic;opacity:.9}
+.week-task.recur-event-row{cursor:default}
 .cal-more{font-size:10px;color:var(--muted);padding-left:2px;margin-top:1px}
 .cal-day-panel{width:270px;flex-shrink:0;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;display:flex;flex-direction:column;gap:10px}
 .cal-day-panel h4{font-size:13px;font-weight:600}
@@ -216,7 +225,9 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
 .search-empty{color:var(--muted);text-align:center;padding:48px 0;font-size:13px}
 
 /* Mobile */
-.mobile-topbar{display:none;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0}
+/* Extra top padding = max(10px, the notch/status-bar safe area) so the
+   hamburger never sits flush against the top edge / status bar clock. */
+.mobile-topbar{display:none;align-items:center;gap:10px;padding:10px 14px;padding-top:max(10px,env(safe-area-inset-top));border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0}
 .mobile-menu-btn{background:var(--surface2);border:1px solid var(--border);color:var(--text);width:34px;height:34px;border-radius:8px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .mobile-topbar-title{font-weight:700;color:var(--accent);font-size:14px}
 .sidebar-overlay{display:none;position:fixed;inset:0;background:#0008;z-index:55}
@@ -254,6 +265,7 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
 .mm-node{position:absolute;color:#fff;font-size:13px;font-weight:600;cursor:grab;border:2px solid transparent;user-select:none;box-shadow:0 2px 10px #0005;touch-action:none}
 .mm-node.dragging{cursor:grabbing;opacity:.85;z-index:20}
 .mm-node.selected{border-color:#fff}
+.mm-node.multi-selected{border-color:#fff;border-style:dashed}
 .mm-node[data-shape="circle"]{border-radius:50%}
 .mm-node[data-shape="rect"]{border-radius:10px}
 /* Text clipping lives on this inner wrapper, not .mm-node itself — the resize
@@ -277,6 +289,7 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
 .hb-grid th{color:var(--muted);font-weight:500;font-size:10px;padding:2px 4px;line-height:1.3}
 .hb-row-name{text-align:left!important;white-space:nowrap;padding-right:10px!important;font-size:13px;font-weight:500;cursor:pointer;color:var(--text)}
 .hb-row-name:hover{color:var(--accent)}
+.hb-row-name.child{padding-left:24px!important;font-size:12px;color:var(--muted)}
 .hb-cell{width:22px;height:22px;border-radius:5px;cursor:pointer;background:var(--surface2);border:1px solid var(--border);transition:transform .1s}
 .hb-cell:hover{transform:scale(1.15)}
 .hb-cell.done{border-color:transparent}
@@ -503,6 +516,7 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
           <h3 id="cal-title"></h3>
           <button class="cal-nav" onclick="calNav(1)">›</button>
           <button class="cal-today-btn" onclick="calGoToday()">Today</button>
+          <button class="btn btn-ghost btn-sm" onclick="openRecurManageModal()">🔁 Recurring Events</button>
         </div>
         <div class="cal-day-names">
           <div class="cal-day-name">Sun</div><div class="cal-day-name">Mon</div>
@@ -608,6 +622,8 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
       <span style="flex:1"></span>
       <button class="btn btn-ghost btn-sm" onclick="addMmNode('circle')">◯ Circle</button>
       <button class="btn btn-ghost btn-sm" onclick="addMmNode('rect')">▭ Rectangle</button>
+      <button class="btn btn-ghost btn-sm" id="mm-copy-btn" onclick="mmCopySelection()" title="Shift-click shapes to select several" style="display:none">⧉ Copy</button>
+      <button class="btn btn-ghost btn-sm" onclick="mmPasteClipboard()" title="Paste here — works across different maps too">📋 Paste</button>
       <button class="btn btn-ghost btn-sm" id="mm-arrow-btn" onclick="cycleMmEdgeArrow()" style="display:none">Arrow: None</button>
       <button class="btn btn-danger btn-sm" id="mm-del-sel-btn" onclick="deleteMmSelection()" style="display:none">Delete Selected</button>
     </div>
@@ -834,6 +850,11 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
   <div class="modal">
     <h3 id="mh-title">New Habit</h3>
     <div class="field"><label>Name</label><input id="mh-name" placeholder="e.g. Drink water, Read, Meditate…"/></div>
+    <div class="field" id="mh-parent-field"><label>Group under</label>
+      <select id="mh-parent" class="mm-select" style="width:100%;max-width:none">
+        <option value="">— None (top-level) —</option>
+      </select>
+    </div>
     <div class="field"><label>Color</label><div class="color-row" id="mh-color-row"></div></div>
     <div class="field"><label>Schedule</label>
       <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
@@ -853,6 +874,47 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeModal('modal-habit')">Cancel</button>
       <button class="btn btn-primary" onclick="saveHabitModal()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Manage Recurring Events -->
+<div class="modal-overlay" id="modal-recur-manage">
+  <div class="modal">
+    <h3>Recurring Events</h3>
+    <div id="recur-manage-list" class="subtask-editor"></div>
+    <div class="modal-actions" style="justify-content:space-between">
+      <button class="btn btn-primary btn-sm" onclick="openNewRecurModal()">＋ Add Recurring Event</button>
+      <button class="btn btn-ghost" onclick="closeModal('modal-recur-manage')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: New/Edit Recurring Event -->
+<div class="modal-overlay" id="modal-recur">
+  <div class="modal">
+    <h3 id="rev-title">New Recurring Event</h3>
+    <div class="field"><label>Name</label><input id="rev-name" placeholder="e.g. Team standup, Rent due, Gym…"/></div>
+    <div class="field"><label>Time (optional)</label><input id="rev-time" type="time" style="max-width:150px"/></div>
+    <div class="field"><label>Color</label><div class="color-row" id="rev-color-row"></div></div>
+    <div class="field"><label>Repeats</label>
+      <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="radio" name="rev-sched" value="daily" checked onchange="setRevScheduleType('daily')"/> Every day</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="radio" name="rev-sched" value="weekly" onchange="setRevScheduleType('weekly')"/> Specific days</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="radio" name="rev-sched" value="monthly" onchange="setRevScheduleType('monthly')"/> Monthly</label>
+      </div>
+    </div>
+    <div class="field" id="rev-weekday-field" style="display:none">
+      <label>Days</label>
+      <div class="weekday-picker" id="rev-weekday-picker"></div>
+    </div>
+    <div class="field" id="rev-monthday-field" style="display:none">
+      <label>Day of month</label>
+      <input id="rev-monthday" type="number" min="1" max="31" value="1" style="max-width:100px"/>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modal-recur');openRecurManageModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveRecurModal()">Save</button>
     </div>
   </div>
 </div>
@@ -952,7 +1014,7 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
 <script>
 const API = '/api';
 const COLORS = ['#6c8eff','#a78bfa','#34d399','#fbbf24','#f87171','#fb923c','#38bdf8','#f472b6','#94a3b8'];
-let data = { columns: [], projects: [], tasks: [], mindmaps: [], habits: [] };
+let data = { columns: [], projects: [], tasks: [], mindmaps: [], habits: [], recurringEvents: [] };
 let listFilters = new Set(), kbProjFilter = null, pdFilter = 'all', pdProjectId = null;
 let hiddenCols = new Set();   // column IDs hidden in kanban
 let dragColId = null;         // column being dragged (for reorder)
@@ -965,6 +1027,10 @@ let searchTimeout = null;
 const mpickState = {};
 // Mind map state
 let mmActiveId = null, mmSelectedNodeId = null, mmSelectedEdgeId = null;
+// Shift-click adds/removes a node from this set for multi-shape copy — the
+// single-select ids above stay for property editing (arrow cycling, etc.)
+// and are always cleared while a multi-selection is active, and vice versa.
+let mmMultiSelected = new Set();
 // Habit state
 let habitColor = COLORS[0], habitScheduleType = 'daily', habitScheduleDays = new Set([1,2,3,4,5]);
 let editingHabitId = null, activeHabitId = null, hbGridOffset = 0;
@@ -1058,6 +1124,7 @@ async function load(){
   if(!data.habits) data.habits=[];
   if(!data.settings) data.settings={};
   if(!data.teamBoards) data.teamBoards=[];
+  if(!data.recurringEvents) data.recurringEvents=[];
   hiddenCols = new Set(data.settings.kanbanHiddenCols||[]);
   renderAll();
 }
@@ -1452,6 +1519,130 @@ async function addScheduledTask(){
 }
 document.getElementById('sc-text').addEventListener('keydown',e=>{ if(e.key==='Enter') addScheduledTask() });
 
+// ── Recurring Events ───────────────────────────
+// Deliberately NOT tasks: no status/checkbox, never counted in task stats.
+// Shown read-only on Calendar/Today/Week so you can see them alongside
+// your tasks without them cluttering the task lists.
+function isEventScheduledOn(ev, dateObj){
+  const r=ev.recurrence||{type:'daily'};
+  if(r.type==='weekly') return (r.days||[]).includes(dateObj.getDay());
+  if(r.type==='monthly') return dateObj.getDate()===(r.day||1);
+  return true; // daily
+}
+function eventsOnDate(dateObj){ return data.recurringEvents.filter(ev=>isEventScheduledOn(ev,dateObj)); }
+function eventsOnDateStr(dateStr){ return eventsOnDate(new Date(dateStr+'T00:00:00')); }
+function recurSummary(ev){
+  const r=ev.recurrence||{type:'daily'};
+  if(r.type==='weekly'){
+    const names=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    return [...(r.days||[])].sort().map(d=>names[d]).join(', ')||'Weekly';
+  }
+  if(r.type==='monthly') return `Monthly on day ${r.day||1}`;
+  return 'Daily';
+}
+function fmtTimeOnly(hhmm){
+  const [h,m]=hhmm.split(':').map(Number);
+  const d=new Date(); d.setHours(h,m,0,0);
+  return d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+}
+
+let revScheduleType='daily', revScheduleDays=new Set([1,2,3,4,5]), revColor=COLORS[0], editingRecurId=null;
+function buildRevWeekdayPicker(){
+  const wrap=document.getElementById('rev-weekday-picker');
+  const names=['S','M','T','W','T','F','S'];
+  wrap.innerHTML=names.map((n,i)=>`<div class="weekday-chip ${revScheduleDays.has(i)?'selected':''}" onclick="toggleRevWeekday(${i},this)">${n}</div>`).join('');
+}
+function toggleRevWeekday(i,el){
+  if(revScheduleDays.has(i)) revScheduleDays.delete(i); else revScheduleDays.add(i);
+  el.classList.toggle('selected');
+}
+function setRevScheduleType(type){
+  revScheduleType=type;
+  document.getElementById('rev-weekday-field').style.display = type==='weekly'?'':'none';
+  document.getElementById('rev-monthday-field').style.display = type==='monthly'?'':'none';
+}
+function selectRevColor(c,el){ revColor=c; document.querySelectorAll('#rev-color-row .color-swatch').forEach(s=>s.classList.remove('selected')); el.classList.add('selected'); }
+
+function openRecurManageModal(){ renderRecurManageList(); openModal('modal-recur-manage'); }
+function renderRecurManageList(){
+  const wrap=document.getElementById('recur-manage-list');
+  if(!data.recurringEvents.length){ wrap.innerHTML='<div style="font-size:12px;color:var(--muted)">No recurring events yet.</div>'; return }
+  wrap.innerHTML=data.recurringEvents.map(ev=>`
+    <div class="subtask-row">
+      <span class="proj-dot" style="background:${ev.color}"></span>
+      <span style="flex:1;font-size:13px">${esc(ev.text)}${ev.time?` <span style="color:var(--muted);font-size:11px">${fmtTimeOnly(ev.time)}</span>`:''}
+        <div style="font-size:11px;color:var(--muted)">${recurSummary(ev)}</div>
+      </span>
+      <button onclick="openEditRecurModal('${ev.id}')" title="Edit">✏</button>
+      <button onclick="deleteRecurEvent('${ev.id}')" title="Delete">×</button>
+    </div>`).join('');
+}
+function openNewRecurModal(){
+  editingRecurId=null;
+  document.getElementById('rev-title').textContent='New Recurring Event';
+  document.getElementById('rev-name').value='';
+  document.getElementById('rev-time').value='';
+  revColor=COLORS[data.recurringEvents.length % COLORS.length];
+  revScheduleType='daily'; revScheduleDays=new Set([1,2,3,4,5]);
+  document.querySelector('input[name="rev-sched"][value="daily"]').checked=true;
+  document.getElementById('rev-weekday-field').style.display='none';
+  document.getElementById('rev-monthday-field').style.display='none';
+  document.getElementById('rev-monthday').value=1;
+  document.getElementById('rev-color-row').innerHTML=COLORS.map(c=>`<div class="color-swatch ${c===revColor?'selected':''}" style="background:${c}" onclick="selectRevColor('${c}',this)"></div>`).join('');
+  buildRevWeekdayPicker();
+  closeModal('modal-recur-manage');
+  openModal('modal-recur');
+}
+function openEditRecurModal(id){
+  const ev=data.recurringEvents.find(e=>e.id===id); if(!ev) return;
+  editingRecurId=ev.id;
+  document.getElementById('rev-title').textContent='Edit Recurring Event';
+  document.getElementById('rev-name').value=ev.text;
+  document.getElementById('rev-time').value=ev.time||'';
+  revColor=ev.color;
+  const r=ev.recurrence||{type:'daily'};
+  revScheduleType=r.type;
+  revScheduleDays=new Set(r.days||[1,2,3,4,5]);
+  document.querySelector(`input[name="rev-sched"][value="${revScheduleType}"]`).checked=true;
+  document.getElementById('rev-weekday-field').style.display = revScheduleType==='weekly'?'':'none';
+  document.getElementById('rev-monthday-field').style.display = revScheduleType==='monthly'?'':'none';
+  document.getElementById('rev-monthday').value=r.day||1;
+  document.getElementById('rev-color-row').innerHTML=COLORS.map(c=>`<div class="color-swatch ${c===revColor?'selected':''}" style="background:${c}" onclick="selectRevColor('${c}',this)"></div>`).join('');
+  buildRevWeekdayPicker();
+  closeModal('modal-recur-manage');
+  openModal('modal-recur');
+}
+async function saveRecurModal(){
+  const text=document.getElementById('rev-name').value.trim();
+  if(!text){ toast('Enter an event name'); return }
+  const time=document.getElementById('rev-time').value || null;
+  let recurrence;
+  if(revScheduleType==='weekly') recurrence={ type:'weekly', days:[...revScheduleDays].sort() };
+  else if(revScheduleType==='monthly'){
+    const day=Math.max(1,Math.min(31,parseInt(document.getElementById('rev-monthday').value,10)||1));
+    recurrence={ type:'monthly', day };
+  } else recurrence={ type:'daily' };
+  if(recurrence.type==='weekly' && recurrence.days.length===0){ toast('Pick at least one day'); return }
+  const body={ text, time, color:revColor, recurrence };
+  if(editingRecurId){
+    await fetch(`${API}/events/${editingRecurId}`,{method:'PATCH',body:JSON.stringify(body),headers:{'Content-Type':'application/json'}});
+  } else {
+    await fetch(`${API}/events`,{method:'POST',body:JSON.stringify(body),headers:{'Content-Type':'application/json'}});
+  }
+  closeModal('modal-recur');
+  await load();
+  openRecurManageModal();
+  toast(editingRecurId?'Event updated':'Event created');
+}
+async function deleteRecurEvent(id){
+  const ev=data.recurringEvents.find(e=>e.id===id);
+  if(!confirm(`Delete recurring event "${ev?.text}"?`)) return;
+  await fetch(`${API}/events/${id}`,{method:'DELETE'});
+  await load();
+  renderRecurManageList();
+  toast('Event deleted');
+}
+
 // ── Calendar ───────────────────────────────────
 function renderCalendar(){
   buildMpickDD('cal');
@@ -1468,13 +1659,16 @@ function renderCalendar(){
   for(let d=1;d<=lastDay.getDate();d++){
     const dateStr=`${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
     const tasks=taskMap[dateStr]||[];
+    const dayEvents=eventsOnDate(new Date(calYear,calMonth,d));
     const dots=tasks.slice(0,3).map(t=>{
       const p=findProject((t.projectIds||[])[0]);
       return `<div class="cal-dot ${t.status==='done'?'done':isOverdue(t)?'overdue':''}" style="background:${p?.color||'var(--accent)'}">${esc(t.text)}</div>`;
     }).join('');
-    const more=tasks.length>3?`<div class="cal-more">+${tasks.length-3} more</div>`:'';
+    const eventDots=dayEvents.slice(0,3).map(ev=>`<div class="cal-dot recur-dot" style="background:${ev.color}">🔁 ${esc(ev.text)}</div>`).join('');
+    const shown=tasks.length+dayEvents.length;
+    const more=shown>6?`<div class="cal-more">+${shown-6} more</div>`:'';
     html+=`<div class="cal-cell ${dateStr===todayStr?'today':''} ${dateStr===calSelectedDate?'selected':''}" onclick="calSelectDay('${dateStr}')">
-      <div class="cal-num">${d}</div><div class="cal-dots">${dots}${more}</div></div>`;
+      <div class="cal-num">${d}</div><div class="cal-dots">${dots}${eventDots}${more}</div></div>`;
   }
   const trailing=7-((firstDay.getDay()+lastDay.getDate())%7); if(trailing<7) for(let d=1;d<=trailing;d++) html+=`<div class="cal-cell other-month"><div class="cal-num">${d}</div></div>`;
   document.getElementById('cal-days').innerHTML=html;
@@ -1490,13 +1684,19 @@ function calSelectDay(dateStr){
   document.getElementById('cal-add-row').style.display='flex';
   buildMpickDD('cal');
   const tasks=data.tasks.filter(t=>t.dueDate&&t.dueDate.slice(0,10)===dateStr);
-  document.getElementById('cal-panel-tasks').innerHTML=tasks.length?tasks.map(t=>`
+  const dayEvents=eventsOnDateStr(dateStr);
+  const eventsHtml=dayEvents.length?`<div class="cal-panel-events">${dayEvents.map(ev=>`
+    <div class="cal-task recur-event-row">
+      <span class="proj-dot" style="background:${ev.color}"></span>
+      <span class="cal-task-text">🔁 ${esc(ev.text)}${ev.time?` <span style="color:var(--muted)">${fmtTimeOnly(ev.time)}</span>`:''}</span>
+    </div>`).join('')}</div>`:'';
+  document.getElementById('cal-panel-tasks').innerHTML=eventsHtml+(tasks.length?tasks.map(t=>`
     <div class="cal-task ${t.status==='done'?'done':''}">
       <input class="task-cb" type="checkbox" ${t.status==='done'?'checked':''} onchange="toggleTask('${t.id}').then(()=>calSelectDay('${dateStr}'))"/>
       <span class="cal-task-text">${esc(t.text)}</span>
       ${taskProjects(t).map(p=>`<span class="proj-tag" style="background:${p.color};font-size:10px;padding:1px 6px">${esc(p.name)}</span>`).join('')}
       <button class="task-del" onclick="delTask('${t.id}').then(()=>calSelectDay('${dateStr}'))">×</button>
-    </div>`).join(''):`<div class="empty" style="padding:16px 0">No tasks this day.</div>`;
+    </div>`).join(''):(dayEvents.length?'':`<div class="empty" style="padding:16px 0">No tasks this day.</div>`));
 }
 
 async function addCalTask(){
@@ -1706,6 +1906,7 @@ function renderToday(){
   const todayTasks=data.tasks.filter(t=>t.dueDate&&t.dueDate.slice(0,10)===todayStr&&!isOverdue(t));
   const inProg=data.tasks.filter(t=>!isCompleted(t)&&t.status!==data.columns[0]?.id&&!t.dueDate);
   const todayDone=data.tasks.filter(t=>isCompleted(t)&&t.dueDate&&t.dueDate.slice(0,10)===todayStr);
+  const todayEvents=eventsOnDate(now).sort((a,b)=>(a.time||'99:99').localeCompare(b.time||'99:99'));
   document.getElementById('today-subtitle').textContent=
     `${overdue.length} overdue · ${todayTasks.length} due today · ${inProg.length} in progress`;
   function section(label,color,tasks){
@@ -1715,7 +1916,23 @@ function renderToday(){
       <div class="task-list">${tasks.map(taskItemHTML).join('')}</div>
     </div>`;
   }
+  // Recurring events aren't tasks — no checkbox, no status — just shown for
+  // awareness, so they get their own read-only section rather than
+  // reusing taskItemHTML.
+  function eventsSection(){
+    if(!todayEvents.length) return '';
+    return `<div class="today-section">
+      <div class="today-section-label" style="color:var(--accent2)">🔁 Recurring Today (${todayEvents.length})</div>
+      <div class="task-list">${todayEvents.map(ev=>`
+        <div class="task-item recur-event-row">
+          <span class="proj-dot" style="background:${ev.color}"></span>
+          <span class="task-text">${esc(ev.text)}</span>
+          ${ev.time?`<span class="si-date">${fmtTimeOnly(ev.time)}</span>`:''}
+        </div>`).join('')}</div>
+    </div>`;
+  }
   document.getElementById('today-content').innerHTML=
+    eventsSection()+
     section('⚠ Overdue','var(--red)',overdue)+
     section('Due Today','var(--green)',todayTasks)+
     section('In Progress','var(--accent)',inProg)+
@@ -1759,6 +1976,7 @@ function renderWeek(){
     const d=new Date(mon); d.setDate(d.getDate()+i);
     const dateStr=d.toISOString().slice(0,10);
     const tasks=taskMap[dateStr]||[];
+    const dayEvents=eventsOnDate(d).sort((a,b)=>(a.time||'99:99').localeCompare(b.time||'99:99'));
     const isToday=dateStr===todayStr;
     return `<div class="week-col ${isToday?'is-today':''}">
       <div class="week-col-header">
@@ -1766,6 +1984,9 @@ function renderWeek(){
         <div class="week-col-date">${d.getDate()}</div>
       </div>
       <div class="week-col-tasks">
+        ${dayEvents.map(ev=>`<div class="week-task recur-event-row" style="border-left-color:${ev.color}" title="Recurring event">
+            🔁 ${esc(ev.text)}${ev.time?` <span class="wt-proj">${fmtTimeOnly(ev.time)}</span>`:''}
+          </div>`).join('')}
         ${tasks.length?tasks.map(t=>{
           const projs=taskProjects(t);
           const projColor=projs[0]?.color||'var(--accent)';
@@ -1775,7 +1996,7 @@ function renderWeek(){
             <div class="wt-proj">${projs.map(p=>esc(p.name)).join(', ')||'No project'}</div>
           </div>`;
         }).join(''):
-        `<div class="week-empty">—</div>`}
+        (dayEvents.length?'':`<div class="week-empty">—</div>`)}
       </div>
     </div>`;
   }).join('');
@@ -1887,7 +2108,7 @@ function renderMindMap(){
   renderMmCanvas();
 }
 
-function selectMindMap(id){ mmActiveId=id; mmSelectedNodeId=null; mmSelectedEdgeId=null; renderMmCanvas(); }
+function selectMindMap(id){ mmActiveId=id; mmSelectedNodeId=null; mmSelectedEdgeId=null; mmMultiSelected=new Set(); renderMmCanvas(); updateMmDeleteBtn(); }
 
 function mmNodeCenter(n){ return { x:n.x+n.w/2, y:n.y+n.h/2 } }
 
@@ -2010,37 +2231,57 @@ function mmNodeEl(n){
     if(txt.contentEditable==='true') return;
     if(e.pointerType==='mouse' && e.button!==0) return; // ignore right/middle mouse
     e.preventDefault();
+    if(e.shiftKey){ mmToggleMultiSelect(n.id); return; }
     selectMmNode(n.id);
     startMmMove(n.id,e);
   });
+  if(mmMultiSelected.has(n.id)) el.classList.add('multi-selected');
   return el;
 }
 
 function selectMmNode(id){
   mmSelectedEdgeId=null;
   mmSelectedNodeId=id;
-  document.querySelectorAll('.mm-node').forEach(el=>el.classList.toggle('selected', el.dataset.id===id));
+  mmMultiSelected.clear();
+  document.querySelectorAll('.mm-node').forEach(el=>{ el.classList.toggle('selected', el.dataset.id===id); el.classList.remove('multi-selected'); });
   document.querySelectorAll('#mm-svg .mm-edge').forEach(el=>el.classList.remove('selected'));
   updateMmDeleteBtn();
 }
 function selectMmEdge(id){
   mmSelectedNodeId=null;
   mmSelectedEdgeId=id;
-  document.querySelectorAll('.mm-node').forEach(el=>el.classList.remove('selected'));
+  mmMultiSelected.clear();
+  document.querySelectorAll('.mm-node').forEach(el=>el.classList.remove('selected','multi-selected'));
   document.querySelectorAll('#mm-svg g').forEach(g=>{
     g.querySelector('.mm-edge').classList.toggle('selected', g.dataset.edgeId===id);
   });
   updateMmDeleteBtn();
 }
-function mmDeselectAll(){
+// Shift-click toggles a shape in/out of the multi-selection used for
+// copy — doesn't start a drag, so it composes with normal click-to-move.
+function mmToggleMultiSelect(id){
   mmSelectedNodeId=null; mmSelectedEdgeId=null;
-  document.querySelectorAll('.mm-node').forEach(el=>el.classList.remove('selected'));
+  if(mmMultiSelected.has(id)) mmMultiSelected.delete(id); else mmMultiSelected.add(id);
+  document.querySelectorAll('.mm-node').forEach(el=>{
+    el.classList.remove('selected');
+    el.classList.toggle('multi-selected', mmMultiSelected.has(el.dataset.id));
+  });
+  document.querySelectorAll('#mm-svg .mm-edge').forEach(el=>el.classList.remove('selected'));
+  updateMmDeleteBtn();
+}
+function mmDeselectAll(){
+  mmSelectedNodeId=null; mmSelectedEdgeId=null; mmMultiSelected.clear();
+  document.querySelectorAll('.mm-node').forEach(el=>el.classList.remove('selected','multi-selected'));
   document.querySelectorAll('#mm-svg .mm-edge').forEach(el=>el.classList.remove('selected'));
   updateMmDeleteBtn();
 }
 const MM_ARROW_LABELS={ none:'Arrow: None', one:'Arrow: One-way', two:'Arrow: Two-way' };
 function updateMmDeleteBtn(){
-  document.getElementById('mm-del-sel-btn').style.display=(mmSelectedNodeId||mmSelectedEdgeId)?'':'none';
+  const delBtn=document.getElementById('mm-del-sel-btn');
+  const hasSel=mmSelectedNodeId||mmSelectedEdgeId||mmMultiSelected.size;
+  delBtn.style.display=hasSel?'':'none';
+  delBtn.textContent=mmMultiSelected.size>1?`Delete Selected (${mmMultiSelected.size})`:'Delete Selected';
+  document.getElementById('mm-copy-btn').style.display=hasSel?'':'none';
   const arrowBtn=document.getElementById('mm-arrow-btn');
   if(mmSelectedEdgeId){
     const map=activeMindMap();
@@ -2210,7 +2451,13 @@ function startMmConnect(fromId,e){
 
 function deleteMmSelection(){
   const map=activeMindMap(); if(!map) return;
-  if(mmSelectedNodeId){
+  if(mmMultiSelected.size){
+    if(!confirm(`Delete ${mmMultiSelected.size} shapes and their connections?`)) return;
+    const ids=mmMultiSelected;
+    map.nodes=map.nodes.filter(n=>!ids.has(n.id));
+    map.edges=(map.edges||[]).filter(e=>!ids.has(e.from)&&!ids.has(e.to));
+    mmMultiSelected=new Set();
+  } else if(mmSelectedNodeId){
     if(!confirm('Delete this shape and its connections?')) return;
     map.nodes=map.nodes.filter(n=>n.id!==mmSelectedNodeId);
     map.edges=(map.edges||[]).filter(e=>e.from!==mmSelectedNodeId&&e.to!==mmSelectedNodeId);
@@ -2221,6 +2468,45 @@ function deleteMmSelection(){
   } else return;
   renderMmCanvas();
   saveMindMap();
+}
+
+// ── Copy / paste a group of shapes (localStorage clipboard, so it survives
+// switching to a *different* mind map before pasting) ───────────────────
+const MM_CLIPBOARD_KEY='mm-clipboard-v1';
+function mmSelectedIdsForCopy(){
+  if(mmMultiSelected.size) return [...mmMultiSelected];
+  if(mmSelectedNodeId) return [mmSelectedNodeId];
+  return [];
+}
+function mmCopySelection(){
+  const map=activeMindMap(); if(!map) return;
+  const ids=new Set(mmSelectedIdsForCopy());
+  if(!ids.size){ toast('Select one or more shapes first (shift-click to select several)'); return }
+  const nodes=map.nodes.filter(n=>ids.has(n.id)).map(n=>({...n}));
+  const edges=(map.edges||[]).filter(e=>ids.has(e.from)&&ids.has(e.to)).map(e=>({...e}));
+  try{ localStorage.setItem(MM_CLIPBOARD_KEY, JSON.stringify({nodes,edges})); }catch(e){}
+  toast(`Copied ${nodes.length} shape${nodes.length===1?'':'s'}`);
+}
+async function mmPasteClipboard(){
+  const map=activeMindMap(); if(!map) return;
+  let clip;
+  try{ clip=JSON.parse(localStorage.getItem(MM_CLIPBOARD_KEY)); }catch(e){}
+  if(!clip || !clip.nodes || !clip.nodes.length){ toast('Nothing copied yet'); return }
+  const idMap={};
+  const newNodes=clip.nodes.map(n=>{
+    const id=crypto.randomUUID();
+    idMap[n.id]=id;
+    return {...n, id, x:n.x+40, y:n.y+40};
+  });
+  const newEdges=(clip.edges||[]).map(e=>({...e, id:crypto.randomUUID(), from:idMap[e.from], to:idMap[e.to]}));
+  map.nodes=[...map.nodes, ...newNodes];
+  map.edges=[...(map.edges||[]), ...newEdges];
+  mmSelectedNodeId=null; mmSelectedEdgeId=null;
+  mmMultiSelected=new Set(newNodes.map(n=>n.id));
+  renderMmCanvas();
+  updateMmCanvasSize();
+  await saveMindMap();
+  toast(`Pasted ${newNodes.length} shape${newNodes.length===1?'':'s'}`);
 }
 
 async function saveMindMap(){
@@ -2237,8 +2523,10 @@ async function createMindMap(){
   const r=await fetch(`${API}/mindmaps`,{method:'POST',body:JSON.stringify({name}),headers:{'Content-Type':'application/json'}});
   const map=await r.json();
   mmActiveId=map.id;
+  mmSelectedNodeId=null; mmSelectedEdgeId=null; mmMultiSelected=new Set();
   closeModal('modal-mindmap');
   await load();
+  updateMmDeleteBtn();
   toast('Mind map created');
 }
 async function renameMindMap(){
@@ -2269,10 +2557,15 @@ document.getElementById('mm-canvas').addEventListener('dblclick', e=>{
   addMmNode('rect', e.clientX-rect.left-70, e.clientY-rect.top-28);
 });
 document.addEventListener('keydown', e=>{
-  if((e.key==='Delete'||e.key==='Backspace') && document.getElementById('view-mindmap').classList.contains('active')){
-    if(document.activeElement && document.activeElement.isContentEditable) return;
-    if(document.activeElement && (document.activeElement.tagName==='INPUT'||document.activeElement.tagName==='TEXTAREA')) return;
-    if(mmSelectedNodeId||mmSelectedEdgeId){ e.preventDefault(); deleteMmSelection(); }
+  if(!document.getElementById('view-mindmap').classList.contains('active')) return;
+  if(document.activeElement && document.activeElement.isContentEditable) return;
+  if(document.activeElement && (document.activeElement.tagName==='INPUT'||document.activeElement.tagName==='TEXTAREA')) return;
+  if((e.key==='Delete'||e.key==='Backspace')){
+    if(mmSelectedNodeId||mmSelectedEdgeId||mmMultiSelected.size){ e.preventDefault(); deleteMmSelection(); }
+  } else if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='c'){
+    e.preventDefault(); mmCopySelection();
+  } else if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='v'){
+    e.preventDefault(); mmPasteClipboard();
   }
 });
 
@@ -2415,23 +2708,19 @@ function adherenceLabel(pct){ return pct>=100?'Perfect':pct>=80?'Great':'Needs w
 // habit's whole history (which can run for months/years) — hbGridOffset
 // pages that window back in whole-window steps; 0 always means "the most
 // recent window, ending today" and can't go past today into the future.
-function renderHabitsGrid(){
-  const wrap=document.getElementById('hb-grid-wrap');
-  if(!data.habits.length){ wrap.innerHTML='<div class="empty">No habits yet. Add one to start tracking.</div>'; document.getElementById('hb-grid-range').textContent=''; return }
-  const today=new Date(); today.setHours(0,0,0,0);
-  const anchor=new Date(today); anchor.setDate(anchor.getDate()-hbGridOffset*HB_DAYS);
-  const days=[];
-  for(let i=HB_DAYS-1;i>=0;i--){ const d=new Date(anchor); d.setDate(d.getDate()-i); days.push(d); }
-  const mo=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  const fmt=d=>`${mo[d.getMonth()]} ${d.getDate()}`;
-  document.getElementById('hb-grid-range').textContent = hbGridOffset===0 ? `${fmt(days[0])} – Today` : `${fmt(days[0])} – ${fmt(days[days.length-1])}`;
-  const dow=['S','M','T','W','T','F','S'];
-  const head=`<tr><th></th><th></th><th></th>${days.map(d=>`<th>${dow[d.getDay()]}<br>${d.getDate()}</th>`).join('')}</tr>`;
-  const rows=data.habits.map(h=>{
-    const st=habitStats(h);
-    const tier=adherenceTier(st.monthPct);
-    return `<tr>
-      <td class="hb-row-name" onclick="openHabitDetail('${h.id}')"><span class="proj-dot" style="background:${h.color};margin-right:6px"></span>${esc(h.name)}
+// Groups (a habit acting as a parent for others, like a subtask parent)
+// are collapsed/expanded client-side only — not worth syncing across
+// devices for something this cosmetic.
+let hbCollapsedGroups=new Set();
+function hbToggleGroup(id){ if(hbCollapsedGroups.has(id)) hbCollapsedGroups.delete(id); else hbCollapsedGroups.add(id); renderHabitsGrid(); }
+function habitRowHtml(h, days, today, isChild){
+  const st=habitStats(h);
+  const tier=adherenceTier(st.monthPct);
+  const children=data.habits.filter(x=>x.parentId===h.id);
+  const collapsed=hbCollapsedGroups.has(h.id);
+  const caret = children.length ? `<button class="btn btn-ghost btn-sm" style="padding:1px 4px" onclick="event.stopPropagation();hbToggleGroup('${h.id}')">${collapsed?'▸':'▾'}</button>` : '';
+  return `<tr>
+      <td class="hb-row-name ${isChild?'child':''}" onclick="openHabitDetail('${h.id}')">${caret}<span class="proj-dot" style="background:${h.color};margin-right:6px"></span>${esc(h.name)}${children.length?` <span style="color:var(--muted);font-weight:400;font-size:11px">(${children.length})</span>`:''}
         <button class="btn btn-ghost btn-sm" style="padding:1px 6px" title="Rename" onclick="event.stopPropagation();openEditHabitModal('${h.id}')">✏</button>
       </td>
       <td><span class="hb-status ${st.status}">${st.label}</span></td>
@@ -2448,8 +2737,25 @@ function renderHabitsGrid(){
         const clickable=!future;
         return `<td><div class="${cls.join(' ')}" style="${style}" ${clickable?`onclick="toggleHabitDay('${h.id}','${iso}')"`:''} title="${iso}"></div></td>`;
       }).join('')}
-    </tr>`;
-  }).join('');
+    </tr>`
+    + (collapsed ? '' : children.map(c=>habitRowHtml(c, days, today, true)).join(''));
+}
+function renderHabitsGrid(){
+  const wrap=document.getElementById('hb-grid-wrap');
+  if(!data.habits.length){ wrap.innerHTML='<div class="empty">No habits yet. Add one to start tracking.</div>'; document.getElementById('hb-grid-range').textContent=''; return }
+  const today=new Date(); today.setHours(0,0,0,0);
+  const anchor=new Date(today); anchor.setDate(anchor.getDate()-hbGridOffset*HB_DAYS);
+  const days=[];
+  for(let i=HB_DAYS-1;i>=0;i--){ const d=new Date(anchor); d.setDate(d.getDate()-i); days.push(d); }
+  const mo=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const fmt=d=>`${mo[d.getMonth()]} ${d.getDate()}`;
+  document.getElementById('hb-grid-range').textContent = hbGridOffset===0 ? `${fmt(days[0])} – Today` : `${fmt(days[0])} – ${fmt(days[days.length-1])}`;
+  const dow=['S','M','T','W','T','F','S'];
+  const head=`<tr><th></th><th></th><th></th>${days.map(d=>`<th>${dow[d.getDay()]}<br>${d.getDate()}</th>`).join('')}</tr>`;
+  // Top-level habits render first, each immediately followed by its own
+  // children (indented) — grouped habits stay together like subtasks under
+  // a parent task, instead of scattering through one flat list.
+  const rows=data.habits.filter(h=>!h.parentId).map(h=>habitRowHtml(h, days, today, false)).join('');
   wrap.innerHTML=`<table class="hb-grid"><thead>${head}</thead><tbody>${rows}</tbody></table>`;
 }
 function hbGridNav(dir){ hbGridOffset=Math.max(0,hbGridOffset+dir); renderHabitsGrid(); }
@@ -2538,6 +2844,19 @@ function setHabitScheduleType(type){
   document.getElementById('mh-weekday-field').style.display = type==='weekly' ? '' : 'none';
   document.getElementById('mh-weekcount-field').style.display = type==='weekly_count' ? '' : 'none';
 }
+// Only top-level habits (no parentId of their own) can be picked as a
+// group parent — keeps nesting to a single level, like task subtasks.
+// A habit that's already a group (has children) can't itself be nested.
+function buildHabitParentPicker(excludeId, currentParentId){
+  const isAlreadyGroup = excludeId && data.habits.some(x=>x.parentId===excludeId);
+  const field=document.getElementById('mh-parent-field');
+  field.style.display = isAlreadyGroup ? 'none' : '';
+  if(isAlreadyGroup) return;
+  const options = data.habits.filter(x=>!x.parentId && x.id!==excludeId);
+  const sel=document.getElementById('mh-parent');
+  sel.innerHTML = '<option value="">— None (top-level) —</option>' +
+    options.map(h=>`<option value="${h.id}" ${h.id===currentParentId?'selected':''}>${esc(h.name)}</option>`).join('');
+}
 function openNewHabitModal(){
   editingHabitId=null;
   document.getElementById('mh-title').textContent='New Habit';
@@ -2551,6 +2870,7 @@ function openNewHabitModal(){
   document.getElementById('mh-weekcount').value=3;
   document.getElementById('mh-color-row').innerHTML=COLORS.map(c=>`<div class="color-swatch ${c===habitColor?'selected':''}" style="background:${c}" onclick="selectHabitColor('${c}',this)"></div>`).join('');
   buildWeekdayPicker();
+  buildHabitParentPicker(null, null);
   openModal('modal-habit');
 }
 function openEditHabitModal(id){
@@ -2567,6 +2887,7 @@ function openEditHabitModal(id){
   document.getElementById('mh-weekcount').value=h.schedule?.timesPerWeek||3;
   document.getElementById('mh-color-row').innerHTML=COLORS.map(c=>`<div class="color-swatch ${c===habitColor?'selected':''}" style="background:${c}" onclick="selectHabitColor('${c}',this)"></div>`).join('');
   buildWeekdayPicker();
+  buildHabitParentPicker(h.id, h.parentId||null);
   openModal('modal-habit');
 }
 function selectHabitColor(c,el){ habitColor=c; document.querySelectorAll('#mh-color-row .color-swatch').forEach(s=>s.classList.remove('selected')); el.classList.add('selected') }
@@ -2580,10 +2901,14 @@ async function saveHabitModal(){
     schedule={ type:'weekly_count', timesPerWeek:n };
   } else schedule={ type:'daily' };
   if(schedule.type==='weekly' && schedule.days.length===0){ toast('Pick at least one day'); return }
+  const parentField=document.getElementById('mh-parent-field');
+  const parentId = parentField.style.display==='none' ? undefined : (document.getElementById('mh-parent').value || null);
+  const body = { name, color:habitColor, schedule };
+  if(parentId!==undefined) body.parentId = parentId;
   if(editingHabitId){
-    await fetch(`${API}/habits/${editingHabitId}`,{method:'PATCH',body:JSON.stringify({name,color:habitColor,schedule}),headers:{'Content-Type':'application/json'}});
+    await fetch(`${API}/habits/${editingHabitId}`,{method:'PATCH',body:JSON.stringify(body),headers:{'Content-Type':'application/json'}});
   } else {
-    await fetch(`${API}/habits`,{method:'POST',body:JSON.stringify({name,color:habitColor,schedule}),headers:{'Content-Type':'application/json'}});
+    await fetch(`${API}/habits`,{method:'POST',body:JSON.stringify(body),headers:{'Content-Type':'application/json'}});
   }
   closeModal('modal-habit');
   await load();

@@ -230,6 +230,7 @@ export default async function handler(req, res) {
           schedule: (body && body.schedule) || { type: "daily" },
           entries: {},
           createdAt: new Date().toISOString().slice(0, 10),
+          parentId: (body && body.parentId) || null,
         };
         data.habits.push(habit);
         await saveData(data);
@@ -256,6 +257,44 @@ export default async function handler(req, res) {
       if (req.method === "DELETE") {
         if (!habit) return notFound();
         data.habits = data.habits.filter((h) => h.id !== id);
+        // Ungroup rather than delete children — losing a whole group's
+        // history because its parent got removed would be surprising.
+        data.habits.forEach((h) => { if (h.parentId === id) h.parentId = null; });
+        await saveData(data);
+        return noContent();
+      }
+      return methodNotAllowed("PATCH, DELETE");
+    }
+
+    // ── /api/events ──────────────────────────────────
+    // Recurring calendar events — shown on the Calendar/Today/Week views
+    // but deliberately NOT tasks (no status, no checkbox, don't count
+    // toward task stats). Recurrence mirrors the habit schedule shape.
+    if (resource === "events") {
+      const data = await loadData();
+      if (!id) {
+        if (req.method !== "POST") return methodNotAllowed("POST");
+        const event = {
+          id: crypto.randomUUID(),
+          text: (body && body.text) || "Untitled Event",
+          time: (body && body.time) || null,
+          color: (body && body.color) || "#6c8eff",
+          recurrence: (body && body.recurrence) || { type: "daily" },
+        };
+        data.recurringEvents.push(event);
+        await saveData(data);
+        return ok(event);
+      }
+      const event = data.recurringEvents.find((e) => e.id === id);
+      if (req.method === "PATCH") {
+        if (!event) return notFound();
+        Object.assign(event, body);
+        await saveData(data);
+        return ok(event);
+      }
+      if (req.method === "DELETE") {
+        if (!event) return notFound();
+        data.recurringEvents = data.recurringEvents.filter((e) => e.id !== id);
         await saveData(data);
         return noContent();
       }
