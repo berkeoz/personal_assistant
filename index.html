@@ -1044,7 +1044,7 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
     <h3 id="tbt-title">Task</h3>
     <div class="field"><label>Task</label><input id="tbt-text"/></div>
     <div class="field"><label>Status</label><select id="tbt-status"></select></div>
-    <div class="field"><label>Assignee</label><select id="tbt-assignee"></select></div>
+    <div class="field"><label>Assignees</label><div class="proj-check-list" id="tbt-assignee-list"></div></div>
     <div class="field"><label>Projects</label><div class="proj-check-list" id="tbt-proj-list"></div></div>
     <div class="field"><label>Due Date</label><input id="tbt-due" type="date"/></div>
     <div class="field"><label>Notes</label><textarea id="tbt-notes" rows="3" placeholder="Add notes, links, details…" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--text);font-size:13px;outline:none;resize:vertical;font-family:inherit;transition:border-color .15s"></textarea></div>
@@ -3285,7 +3285,7 @@ function renderTbBoard(){
 
   let tasks=board.tasks;
   if(tbProjFilter) tasks=tasks.filter(t=>(t.projectIds||[]).includes(tbProjFilter));
-  if(tbAssigneeFilter) tasks=tasks.filter(t=>t.assigneeId===tbAssigneeFilter);
+  if(tbAssigneeFilter) tasks=tasks.filter(t=>(t.assigneeIds||[]).includes(tbAssigneeFilter));
   const visibleCols=board.columns.filter(c=>!tbHiddenCols.has(c.id));
 
   let html=visibleCols.map(col=>{
@@ -3301,12 +3301,12 @@ function renderTbBoard(){
       </div>
       <div class="kanban-cards" id="tbkc-${col.id}">
         ${cards.map(t=>{
-          const assignee=tbMemberById(board,t.assigneeId);
+          const assignees=(t.assigneeIds||[]).map(mid=>tbMemberById(board,mid)).filter(Boolean);
           const projs=(t.projectIds||[]).map(pid=>tbProjectById(board,pid)).filter(Boolean);
           return `<div class="kanban-card" draggable="true" ondragstart="tbDragStart(event,'${t.id}')" ondragend="tbDragEnd(event)" onclick="openEditTbTask('${t.id}')">
             <div class="kc-text">${esc(t.text)}</div>
             <div class="kc-meta">
-              ${assignee?`<span class="proj-tag" style="background:${assignee.color}">${esc(assignee.name)}</span>`:`<span class="tag">Unassigned</span>`}
+              ${assignees.length?assignees.map(a=>`<span class="proj-tag" style="background:${a.color}">${esc(a.name)}</span>`).join(''):`<span class="tag">Unassigned</span>`}
               ${projs.map(p=>`<span class="proj-tag" style="background:${p.color};font-size:10px;padding:1px 6px">${esc(p.name)}</span>`).join('')}
               ${t.dueDate?`<span class="due-tag ${isOverdue(t)?'overdue':isToday(t)?'today':''}">${fmtDate(t.dueDate)}</span>`:''}
               <button class="task-del" onclick="event.stopPropagation();confirmDelTbTask('${t.id}')">×</button>
@@ -3480,7 +3480,8 @@ function openNewTbTaskModal(){
   document.getElementById('tbt-title').textContent='New Task';
   document.getElementById('tbt-text').value='';
   document.getElementById('tbt-status').innerHTML=board.columns.map((c,i)=>`<option value="${c.id}" ${i===0?'selected':''}>${esc(c.name)}</option>`).join('');
-  document.getElementById('tbt-assignee').innerHTML='<option value="">Unassigned</option>'+board.members.map(m=>`<option value="${m.id}" ${tbAssigneeFilter===m.id?'selected':''}>${esc(m.name)}</option>`).join('');
+  document.getElementById('tbt-assignee-list').innerHTML=board.members.length ? board.members.map(m=>`
+    <label class="proj-check-item"><input type="checkbox" value="${m.id}" ${tbAssigneeFilter===m.id?'checked':''}/><span class="proj-dot" style="background:${m.color}"></span>${esc(m.name)}</label>`).join('') : `<div style="font-size:12px;color:var(--muted)">No members yet — add one via Manage Team.</div>`;
   document.getElementById('tbt-due').value='';
   document.getElementById('tbt-notes').value='';
   document.getElementById('tbt-proj-list').innerHTML=board.projects.length ? board.projects.map(p=>`
@@ -3493,7 +3494,8 @@ function openEditTbTask(id){
   document.getElementById('tbt-title').textContent='Edit Task';
   document.getElementById('tbt-text').value=t.text||'';
   document.getElementById('tbt-status').innerHTML=board.columns.map(c=>`<option value="${c.id}" ${t.status===c.id?'selected':''}>${esc(c.name)}</option>`).join('');
-  document.getElementById('tbt-assignee').innerHTML='<option value="">Unassigned</option>'+board.members.map(m=>`<option value="${m.id}" ${t.assigneeId===m.id?'selected':''}>${esc(m.name)}</option>`).join('');
+  document.getElementById('tbt-assignee-list').innerHTML=board.members.length ? board.members.map(m=>`
+    <label class="proj-check-item"><input type="checkbox" value="${m.id}" ${(t.assigneeIds||[]).includes(m.id)?'checked':''}/><span class="proj-dot" style="background:${m.color}"></span>${esc(m.name)}</label>`).join('') : `<div style="font-size:12px;color:var(--muted)">No members yet — add one via Manage Team.</div>`;
   document.getElementById('tbt-due').value=t.dueDate?t.dueDate.slice(0,10):'';
   document.getElementById('tbt-notes').value=t.notes||'';
   document.getElementById('tbt-proj-list').innerHTML=board.projects.length ? board.projects.map(p=>`
@@ -3504,11 +3506,11 @@ async function saveTbTask(){
   const board=activeTeamBoard();
   const text=document.getElementById('tbt-text').value.trim(); if(!text){ toast('Enter task text'); return }
   const status=document.getElementById('tbt-status').value;
-  const assigneeId=document.getElementById('tbt-assignee').value||null;
+  const assigneeIds=[...document.querySelectorAll('#tbt-assignee-list input:checked')].map(c=>c.value);
   const due=document.getElementById('tbt-due').value;
   const notes=document.getElementById('tbt-notes').value.trim();
   const projectIds=[...document.querySelectorAll('#tbt-proj-list input:checked')].map(c=>c.value);
-  const payload={text,status,assigneeId,dueDate:due||null,notes:notes||null,projectIds};
+  const payload={text,status,assigneeIds,dueDate:due||null,notes:notes||null,projectIds};
   if(editingTbTaskId){
     await fetch(`${API}/teamboards/${board.id}/tasks/${editingTbTaskId}`,{method:'PATCH',body:JSON.stringify(payload),headers:{'Content-Type':'application/json'}});
   } else {
@@ -3532,12 +3534,12 @@ function renderTbHistory(){
   if(q) tasks=tasks.filter(t=>t.text.toLowerCase().includes(q));
   tasks=[...tasks].sort((a,b)=>(b.completedAt||'').localeCompare(a.completedAt||''));
   document.getElementById('tb-history-list').innerHTML = tasks.length ? tasks.map(t=>{
-    const assignee=tbMemberById(board,t.assigneeId);
+    const assignees=(t.assigneeIds||[]).map(mid=>tbMemberById(board,mid)).filter(Boolean);
     const projs=(t.projectIds||[]).map(pid=>tbProjectById(board,pid)).filter(Boolean);
     return `<div class="task-item done">
       <span class="task-text">${esc(t.text)}</span>
       <div class="task-meta">
-        ${assignee?`<span class="proj-tag" style="background:${assignee.color}">${esc(assignee.name)}</span>`:''}
+        ${assignees.map(a=>`<span class="proj-tag" style="background:${a.color}">${esc(a.name)}</span>`).join('')}
         ${projs.map(p=>`<span class="proj-tag" style="background:${p.color}">${esc(p.name)}</span>`).join('')}
         <button class="btn btn-ghost btn-sm" onclick="openEditTbTask('${t.id}')">✏</button>
         <button class="task-del" onclick="confirmDelTbTask('${t.id}')">×</button>
@@ -3594,7 +3596,7 @@ function getExportRows(){
   return tasks.filter(t=>{
     if(exportStatusSel.size && !exportStatusSel.has(t.status)) return false;
     if(exportProjectSel.size && !(t.projectIds||[]).some(pid=>exportProjectSel.has(pid))) return false;
-    if(members && exportAssigneeSel.size && !exportAssigneeSel.has(t.assigneeId)) return false;
+    if(members && exportAssigneeSel.size && !(t.assigneeIds||[]).some(mid=>exportAssigneeSel.has(mid))) return false;
     const due=t.dueDate?t.dueDate.slice(0,10):null;
     if(from && (!due||due<from)) return false;
     if(to && (!due||due>to)) return false;
@@ -3603,7 +3605,7 @@ function getExportRows(){
     const col=columns.find(c=>c.id===t.status);
     const projNames=(t.projectIds||[]).map(pid=>projects.find(p=>p.id===pid)?.name).filter(Boolean).join(', ');
     const row={ Task:t.text||'', Status:col?.name||t.status||'' };
-    if(members) row.Assignee = members.find(m=>m.id===t.assigneeId)?.name || 'Unassigned';
+    if(members) row.Assignee = (t.assigneeIds||[]).map(mid=>members.find(m=>m.id===mid)?.name).filter(Boolean).join(', ') || 'Unassigned';
     row.Project=projNames;
     row.DueDate=t.dueDate?t.dueDate.slice(0,10):'';
     row.Tags=(t.tags||[]).join(', ');

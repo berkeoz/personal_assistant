@@ -426,7 +426,9 @@ export default async function handler(req, res) {
         if (req.method === "DELETE") {
           if (!member) return notFound();
           board.members = board.members.filter((m) => m.id !== subId);
-          for (const t of board.tasks) if (t.assigneeId === subId) t.assigneeId = null;
+          for (const t of board.tasks) {
+            if (Array.isArray(t.assigneeIds)) t.assigneeIds = t.assigneeIds.filter((mid) => mid !== subId);
+          }
           await saveData(data);
           return noContent();
         }
@@ -491,6 +493,7 @@ export default async function handler(req, res) {
           const task = { ...body, id: crypto.randomUUID() };
           if (task.status === undefined) task.status = board.columns[0]?.id;
           if (task.projectIds === undefined) task.projectIds = [];
+          if (task.assigneeIds === undefined) task.assigneeIds = [];
           if (task.tags === undefined) task.tags = [];
           stampCompletion(task, board.columns);
           board.tasks.push(task);
