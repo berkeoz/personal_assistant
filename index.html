@@ -1090,7 +1090,7 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
 const API = '/api';
 const COLORS = ['#6c8eff','#a78bfa','#34d399','#fbbf24','#f87171','#fb923c','#38bdf8','#f472b6','#94a3b8'];
 let data = { columns: [], projects: [], tasks: [], mindmaps: [], habits: [], recurringEvents: [], diary: [] };
-let listFilters = new Set(), kbProjFilter = null, pdFilter = 'all', pdProjectId = null;
+let listFilters = new Set(), kbProjFilters = new Set(), pdFilter = 'all', pdProjectId = null;
 let hiddenCols = new Set();   // column IDs hidden in kanban
 let dragColId = null;         // column being dragged (for reorder)
 let editingTaskId = null, dragTaskId = null;
@@ -1202,6 +1202,7 @@ async function load(){
   if(!data.recurringEvents) data.recurringEvents=[];
   if(!data.diary) data.diary=[];
   hiddenCols = new Set(data.settings.kanbanHiddenCols||[]);
+  kbProjFilters = new Set(data.settings.kanbanProjectFilter||[]);
   renderAll();
 }
 
@@ -1415,9 +1416,9 @@ function renderKanban(){
   const kbf=document.getElementById('kb-proj-filter');
   kbf.innerHTML=`
     <div class="kb-toolbar">
-      <span class="kb-toolbar-label">Project:</span>
-      <button class="chip ${!kbProjFilter?'active':''}" onclick="setKbFilter(null,this)">All</button>
-      ${data.projects.map(p=>`<button class="chip ${kbProjFilter===p.id?'active':''}" onclick="setKbFilter('${p.id}',this)">${esc(p.name)}</button>`).join('')}
+      <span class="kb-toolbar-label">Projects:</span>
+      <button class="chip ${kbProjFilters.size===0?'active':''}" onclick="toggleKbProjFilter(null)">All</button>
+      ${data.projects.map(p=>`<button class="chip ${kbProjFilters.has(p.id)?'active':''}" onclick="toggleKbProjFilter('${p.id}')">${esc(p.name)}</button>`).join('')}
     </div>
     <div class="kb-toolbar">
       <span class="kb-toolbar-label">Columns:</span>
@@ -1428,7 +1429,11 @@ function renderKanban(){
         </button>`).join('')}
     </div>`;
 
-  const tasks=data.tasks.filter(t=>!kbProjFilter||(t.projectIds||[]).includes(kbProjFilter));
+  // Empty selection = show every project's tasks; otherwise a task shows if
+  // it belongs to ANY selected project (OR logic, same as the All Tasks
+  // status filters). Tasks with no project at all always show, since
+  // there's no project chip that could ever include them.
+  const tasks=data.tasks.filter(t=>kbProjFilters.size===0||!t.projectIds||t.projectIds.length===0||t.projectIds.some(pid=>kbProjFilters.has(pid)));
   const visibleCols=data.columns.filter(c=>!hiddenCols.has(c.id));
 
   let html=visibleCols.map(col=>{
@@ -1477,7 +1482,19 @@ async function toggleColVisibility(id){
   }catch(e){ toast('Failed to save column visibility'); }
 }
 
-function setKbFilter(id,btn){ kbProjFilter=id; document.querySelectorAll('#kb-proj-filter .chip').forEach(c=>c.classList.remove('active')); btn.classList.add('active'); renderKanban() }
+// Multiple projects can be checked at once — a task shows if it belongs to
+// any of them. "All" clears the selection back to showing everything.
+// Persisted via /api/settings so the choice follows you across devices,
+// same as the column-visibility toggles above.
+async function toggleKbProjFilter(id){
+  if(id===null){ kbProjFilters.clear(); }
+  else if(kbProjFilters.has(id)){ kbProjFilters.delete(id); }
+  else{ kbProjFilters.add(id); }
+  renderKanban();
+  try{
+    await fetch(`${API}/settings`,{method:'PATCH',body:JSON.stringify({kanbanProjectFilter:[...kbProjFilters]}),headers:{'Content-Type':'application/json'}});
+  }catch(e){ toast('Failed to save project filter'); }
+}
 
 // ── Task card drag (move between columns) ─────
 function kbDragStart(e,id){ e.stopPropagation(); dragTaskId=id; dragColId=null; e.target.classList.add('dragging') }
