@@ -1047,6 +1047,14 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
     <div class="field"><label>Assignees</label><div class="proj-check-list" id="tbt-assignee-list"></div></div>
     <div class="field"><label>Projects</label><div class="proj-check-list" id="tbt-proj-list"></div></div>
     <div class="field"><label>Due Date</label><input id="tbt-due" type="date"/></div>
+    <div class="field">
+      <label>Subtasks</label>
+      <div class="subtask-editor" id="tbt-subtask-list"></div>
+      <div class="add-subtask-row">
+        <input id="tbt-subtask-input" type="text" placeholder="Add subtask… (Enter)"/>
+        <button class="btn btn-ghost btn-sm" onclick="addTbSubtaskInModal()">+ Add</button>
+      </div>
+    </div>
     <div class="field"><label>Notes</label><textarea id="tbt-notes" rows="3" placeholder="Add notes, links, details…" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--text);font-size:13px;outline:none;resize:vertical;font-family:inherit;transition:border-color .15s"></textarea></div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeModal('modal-tb-task')">Cancel</button>
@@ -1112,7 +1120,7 @@ let editingHabitId = null, activeHabitId = null, hbGridOffset = 0;
 let hbCalYear = new Date().getFullYear(), hbCalMonth = new Date().getMonth();
 // Team board state
 let tbActiveId = null, tbHiddenCols = new Set(), tbProjFilter = null, tbAssigneeFilter = null, tbView = 'board';
-let tbDragTaskId = null, editingTbTaskId = null, tbNewColColor = COLORS[0];
+let tbDragTaskId = null, tbDragColId = null, editingTbTaskId = null, tbNewColColor = COLORS[0];
 // Export state
 let exportScope = 'personal', exportBoardId = null;
 let exportStatusSel = new Set(), exportProjectSel = new Set(), exportAssigneeSel = new Set();
@@ -2073,6 +2081,24 @@ function addSubtaskInModal(){
   inp.value=''; renderModalSubtasks();
 }
 document.addEventListener('keydown',e=>{ if(e.key==='Enter'&&document.activeElement===document.getElementById('mt-subtask-input')) addSubtaskInModal(); });
+
+// Same subtask-editor pattern as personal tasks, mirrored for team tasks.
+let tbModalSubtasks=[];
+function renderTbModalSubtasks(){
+  document.getElementById('tbt-subtask-list').innerHTML=tbModalSubtasks.map((s,i)=>`
+    <div class="subtask-row">
+      <input type="checkbox" ${s.done?'checked':''} onchange="tbModalSubtasks[${i}].done=this.checked"/>
+      <input type="text" value="${esc(s.text)}" oninput="tbModalSubtasks[${i}].text=this.value" placeholder="Subtask…"/>
+      <button onclick="tbModalSubtasks.splice(${i},1);renderTbModalSubtasks()">×</button>
+    </div>`).join('');
+}
+function addTbSubtaskInModal(){
+  const inp=document.getElementById('tbt-subtask-input');
+  const text=inp.value.trim(); if(!text) return;
+  tbModalSubtasks.push({id:crypto.randomUUID(),text,done:false});
+  inp.value=''; renderTbModalSubtasks();
+}
+document.addEventListener('keydown',e=>{ if(e.key==='Enter'&&document.activeElement===document.getElementById('tbt-subtask-input')) addTbSubtaskInModal(); });
 
 // ── Today view ─────────────────────────────────
 function renderToday(){
@@ -3291,10 +3317,14 @@ function renderTbBoard(){
   let html=visibleCols.map(col=>{
     const cards=tasks.filter(t=>t.status===col.id);
     return `<div class="kanban-col" id="tbcol-${col.id}"
+      draggable="true"
+      ondragstart="tbColDragStart(event,'${col.id}')"
+      ondragend="tbColDragEnd(event)"
       ondragover="tbDragOver(event,'${col.id}')"
       ondrop="tbDrop(event,'${col.id}')"
       ondragleave="tbDragLeave(event)">
       <div class="kanban-header" style="border-top:3px solid ${col.color}">
+        <span class="kh-drag" title="Drag to reorder">⠿</span>
         <span class="kh-name" onclick="renameTbColumn('${col.id}')" title="Click to rename">${esc(col.name)}</span>
         <span class="kh-count">${cards.length}</span>
         <button class="kh-del" onclick="deleteTbColumn('${col.id}')" title="Delete column">×</button>
@@ -3303,8 +3333,9 @@ function renderTbBoard(){
         ${cards.map(t=>{
           const assignees=(t.assigneeIds||[]).map(mid=>tbMemberById(board,mid)).filter(Boolean);
           const projs=(t.projectIds||[]).map(pid=>tbProjectById(board,pid)).filter(Boolean);
+          const subs=t.subtasks||[];
           return `<div class="kanban-card" draggable="true" ondragstart="tbDragStart(event,'${t.id}')" ondragend="tbDragEnd(event)" onclick="openEditTbTask('${t.id}')">
-            <div class="kc-text">${esc(t.text)}</div>
+            <div class="kc-text">${esc(t.text)}${subs.length?` <span class="subtask-progress">${subs.filter(s=>s.done).length}/${subs.length} ✓</span>`:''}</div>
             <div class="kc-meta">
               ${assignees.length?assignees.map(a=>`<span class="proj-tag" style="background:${a.color}">${esc(a.name)}</span>`).join(''):`<span class="tag">Unassigned</span>`}
               ${projs.map(p=>`<span class="proj-tag" style="background:${p.color};font-size:10px;padding:1px 6px">${esc(p.name)}</span>`).join('')}
@@ -3324,22 +3355,48 @@ function setTbProjFilter(id){ tbProjFilter=id; renderTbBoard(); }
 function setTbAssigneeFilter(id){ tbAssigneeFilter=id; renderTbBoard(); }
 
 // ── Team task drag-and-drop ──────────────────────
-function tbDragStart(e,id){ e.stopPropagation(); tbDragTaskId=id; e.target.classList.add('dragging'); }
-function tbDragEnd(e){ e.target.classList.remove('dragging'); document.querySelectorAll('#tb-kanban-outer .kanban-col').forEach(c=>c.classList.remove('drag-over')); }
+function tbDragStart(e,id){ e.stopPropagation(); tbDragTaskId=id; tbDragColId=null; e.target.classList.add('dragging'); }
+function tbDragEnd(e){ e.target.classList.remove('dragging'); document.querySelectorAll('#tb-kanban-outer .kanban-col').forEach(c=>c.classList.remove('drag-over','col-dragging','col-drop-before','col-drop-after')); }
 function tbDragOver(e,colId){
   e.preventDefault(); e.stopPropagation();
+  if(tbDragColId) return; // column reorder handled separately
   document.querySelectorAll('#tb-kanban-outer .kanban-col').forEach(c=>c.classList.remove('drag-over'));
   document.getElementById('tbcol-'+colId)?.classList.add('drag-over');
 }
 function tbDragLeave(e){ if(!e.currentTarget.contains(e.relatedTarget)) e.currentTarget.classList.remove('drag-over') }
 async function tbDrop(e,colId){
   e.preventDefault(); e.stopPropagation();
-  document.querySelectorAll('#tb-kanban-outer .kanban-col').forEach(c=>c.classList.remove('drag-over'));
+  document.querySelectorAll('#tb-kanban-outer .kanban-col').forEach(c=>c.classList.remove('drag-over','col-drop-before','col-drop-after'));
+  if(tbDragColId){ await handleTbColDrop(colId); return }
   if(!tbDragTaskId) return;
   const board=activeTeamBoard();
   await fetch(`${API}/teamboards/${board.id}/tasks/${tbDragTaskId}`,{method:'PATCH',body:JSON.stringify({status:colId}),headers:{'Content-Type':'application/json'}});
   tbDragTaskId=null;
   await load();
+}
+
+// ── Column reorder drag (Teams board) ─────────
+function tbColDragStart(e,id){
+  if(tbDragTaskId) return; // task drag takes priority
+  tbDragColId=id; tbDragTaskId=null;
+  e.currentTarget.classList.add('col-dragging');
+}
+function tbColDragEnd(e){
+  tbDragColId=null;
+  document.querySelectorAll('#tb-kanban-outer .kanban-col').forEach(c=>c.classList.remove('col-dragging','col-drop-before','col-drop-after','drag-over'));
+}
+async function handleTbColDrop(targetColId){
+  if(!tbDragColId||tbDragColId===targetColId) return;
+  const board=activeTeamBoard();
+  const cols=[...board.columns];
+  const fromIdx=cols.findIndex(c=>c.id===tbDragColId);
+  const toIdx=cols.findIndex(c=>c.id===targetColId);
+  if(fromIdx===-1||toIdx===-1) return;
+  const [moved]=cols.splice(fromIdx,1);
+  cols.splice(toIdx,0,moved);
+  tbDragColId=null;
+  await fetch(`${API}/teamboards/${board.id}`,{method:'PATCH',body:JSON.stringify({columns:cols}),headers:{'Content-Type':'application/json'}});
+  await load(); toast('Column reordered');
 }
 async function tbQuickAdd(e,colId){
   if(e.key!=='Enter') return;
@@ -3486,6 +3543,8 @@ function openNewTbTaskModal(){
   document.getElementById('tbt-notes').value='';
   document.getElementById('tbt-proj-list').innerHTML=board.projects.length ? board.projects.map(p=>`
     <label class="proj-check-item"><input type="checkbox" value="${p.id}" ${tbProjFilter===p.id?'checked':''}/><span class="proj-dot" style="background:${p.color}"></span>${esc(p.name)}</label>`).join('') : `<div style="font-size:12px;color:var(--muted)">No projects yet — add one via Manage Team.</div>`;
+  tbModalSubtasks=[];
+  renderTbModalSubtasks();
   openModal('modal-tb-task');
 }
 function openEditTbTask(id){
@@ -3500,6 +3559,8 @@ function openEditTbTask(id){
   document.getElementById('tbt-notes').value=t.notes||'';
   document.getElementById('tbt-proj-list').innerHTML=board.projects.length ? board.projects.map(p=>`
     <label class="proj-check-item"><input type="checkbox" value="${p.id}" ${(t.projectIds||[]).includes(p.id)?'checked':''}/><span class="proj-dot" style="background:${p.color}"></span>${esc(p.name)}</label>`).join('') : `<div style="font-size:12px;color:var(--muted)">No projects yet — add one via Manage Team.</div>`;
+  tbModalSubtasks=[...(t.subtasks||[]).map(s=>({...s}))];
+  renderTbModalSubtasks();
   openModal('modal-tb-task');
 }
 async function saveTbTask(){
@@ -3510,7 +3571,10 @@ async function saveTbTask(){
   const due=document.getElementById('tbt-due').value;
   const notes=document.getElementById('tbt-notes').value.trim();
   const projectIds=[...document.querySelectorAll('#tbt-proj-list input:checked')].map(c=>c.value);
-  const payload={text,status,assigneeIds,dueDate:due||null,notes:notes||null,projectIds};
+  const subInputs=document.querySelectorAll('#tbt-subtask-list .subtask-row input[type=text]');
+  subInputs.forEach((inp,i)=>{ if(tbModalSubtasks[i]) tbModalSubtasks[i].text=inp.value.trim(); });
+  const subtasks=tbModalSubtasks.filter(s=>s.text);
+  const payload={text,status,assigneeIds,dueDate:due||null,notes:notes||null,projectIds,subtasks};
   if(editingTbTaskId){
     await fetch(`${API}/teamboards/${board.id}/tasks/${editingTbTaskId}`,{method:'PATCH',body:JSON.stringify(payload),headers:{'Content-Type':'application/json'}});
   } else {
