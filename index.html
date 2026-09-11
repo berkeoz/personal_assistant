@@ -97,6 +97,7 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
 .due-tag{font-size:11px;padding:2px 7px;border-radius:10px;background:var(--surface2);color:var(--muted)}
 .due-tag.overdue{background:#3d1515;color:var(--red)}
 .due-tag.today{background:#1d2d1a;color:var(--green)}
+.priority-badge{font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px;border:1px solid;white-space:nowrap}
 .status-badge{font-size:10px;padding:2px 7px;border-radius:10px;text-transform:uppercase;letter-spacing:.5px}
 .status-todo{background:var(--surface3);color:var(--muted)}
 .status-inprogress{background:#1a2a3d;color:var(--accent)}
@@ -402,6 +403,7 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
 .diary-insight-item span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .diary-insight-count{color:var(--muted);flex-shrink:0}
 #diary-insights-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn-ghost.active{background:var(--accent);color:#fff;border-color:var(--accent)}
 
 /* Calendar connection items in sidebar */
 .cal-conn-item{display:flex;align-items:center;gap:7px;padding:6px 10px;border-radius:8px;font-size:12px;color:var(--muted)}
@@ -734,7 +736,7 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
     <div id="tb-content">
       <div class="mm-toolbar">
         <button class="chip active" id="tb-tab-board" onclick="setTbView('board')">📋 Board</button>
-        <button class="chip" id="tb-tab-history" onclick="setTbView('history')">🕘 History</button>
+        <button class="chip" id="tb-tab-history" onclick="setTbView('history')">🕘 History <span id="tb-history-count"></span></button>
         <span style="flex:1"></span>
         <button class="btn btn-primary btn-sm" onclick="openNewTbTaskModal()">＋ Add Task</button>
         <button class="btn btn-ghost btn-sm" onclick="openExportModal('team')">⬇ Export</button>
@@ -743,6 +745,7 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
       <div id="tb-board-view">
         <div class="kb-toolbar" id="tb-assignee-row"></div>
         <div class="kb-toolbar" id="tb-project-row"></div>
+        <div class="kb-toolbar" id="tb-priority-row"></div>
         <div class="kanban-outer" id="tb-kanban-outer"></div>
       </div>
       <div id="tb-history-view" style="display:none">
@@ -777,6 +780,14 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
     <div class="field"><label>Task</label><input id="mt-text"/></div>
     <div class="field"><label>Status</label>
       <select id="mt-status"></select>
+    </div>
+    <div class="field"><label>Priority</label>
+      <select id="mt-priority">
+        <option value="">None</option>
+        <option value="low">Low</option>
+        <option value="medium">Medium</option>
+        <option value="high">High</option>
+      </select>
     </div>
     <div class="field"><label>Projects</label>
       <div class="proj-check-list" id="mt-proj-list"></div>
@@ -1044,6 +1055,14 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
     <h3 id="tbt-title">Task</h3>
     <div class="field"><label>Task</label><input id="tbt-text"/></div>
     <div class="field"><label>Status</label><select id="tbt-status"></select></div>
+    <div class="field"><label>Priority</label>
+      <select id="tbt-priority">
+        <option value="">None</option>
+        <option value="low">Low</option>
+        <option value="medium">Medium</option>
+        <option value="high">High</option>
+      </select>
+    </div>
     <div class="field"><label>Assignees</label><div class="proj-check-list" id="tbt-assignee-list"></div></div>
     <div class="field"><label>Projects</label><div class="proj-check-list" id="tbt-proj-list"></div></div>
     <div class="field"><label>Due Date</label><input id="tbt-due" type="date"/></div>
@@ -1097,8 +1116,20 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
 <script>
 const API = '/api';
 const COLORS = ['#6c8eff','#a78bfa','#34d399','#fbbf24','#f87171','#fb923c','#38bdf8','#f472b6','#94a3b8'];
+
+// ── Task priority (shared by personal Kanban + Teams) ─────────────
+const PRIORITY_META = {
+  high:   { label:'High',   color:'#f87171', rank:3 },
+  medium: { label:'Medium', color:'#fbbf24', rank:2 },
+  low:    { label:'Low',    color:'#38bdf8', rank:1 },
+};
+function priorityRank(p){ return PRIORITY_META[p]?.rank||0; }
+function priorityBadge(p){
+  const m=PRIORITY_META[p]; if(!m) return '';
+  return `<span class="priority-badge" style="color:${m.color};border-color:${m.color}">${m.label}</span>`;
+}
 let data = { columns: [], projects: [], tasks: [], mindmaps: [], habits: [], recurringEvents: [], diary: [] };
-let listFilters = new Set(), kbProjFilters = new Set(), pdFilter = 'all', pdProjectId = null;
+let listFilters = new Set(), kbProjFilters = new Set(), kbPriorityFilters = new Set(), kbSortByPriority = false, pdFilter = 'all', pdProjectId = null;
 let hiddenCols = new Set();   // column IDs hidden in kanban
 let dragColId = null;         // column being dragged (for reorder)
 let editingTaskId = null, dragTaskId = null;
@@ -1119,7 +1150,7 @@ let habitColor = COLORS[0], habitScheduleType = 'daily', habitScheduleDays = new
 let editingHabitId = null, activeHabitId = null, hbGridOffset = 0;
 let hbCalYear = new Date().getFullYear(), hbCalMonth = new Date().getMonth();
 // Team board state
-let tbActiveId = null, tbHiddenCols = new Set(), tbProjFilter = null, tbAssigneeFilter = null, tbView = 'board';
+let tbActiveId = null, tbHiddenCols = new Set(), tbProjFilter = null, tbAssigneeFilter = null, tbPriorityFilters = new Set(), tbSortByPriority = false, tbView = 'board';
 let tbDragTaskId = null, tbDragColId = null, editingTbTaskId = null, tbNewColColor = COLORS[0];
 // Export state
 let exportScope = 'personal', exportBoardId = null;
@@ -1389,6 +1420,7 @@ function openEditTask(id){
   document.getElementById('mt-text').value=t.text||'';
   // populate status select from columns
   document.getElementById('mt-status').innerHTML = data.columns.map(c=>`<option value="${c.id}" ${t.status===c.id?'selected':''}>${esc(c.name)}</option>`).join('');
+  document.getElementById('mt-priority').value=t.priority||'';
   document.getElementById('mt-due').value=t.dueDate?t.dueDate.slice(0,10):'';
   document.getElementById('mt-tags').value=(t.tags||[]).join(', ');
   document.getElementById('mt-notes').value=t.notes||'';
@@ -1406,6 +1438,7 @@ function openEditTask(id){
 async function saveEditTask(){
   const text=document.getElementById('mt-text').value.trim(); if(!text) return;
   const status=document.getElementById('mt-status').value;
+  const priority=document.getElementById('mt-priority').value||null;
   const due=document.getElementById('mt-due').value;
   const tags=document.getElementById('mt-tags').value.split(',').map(s=>s.trim()).filter(Boolean);
   const pids=[...document.querySelectorAll('#mt-proj-list input:checked')].map(i=>i.value);
@@ -1414,7 +1447,7 @@ async function saveEditTask(){
   const subInputs=document.querySelectorAll('#mt-subtask-list .subtask-row input[type=text]');
   subInputs.forEach((inp,i)=>{ if(modalSubtasks[i]) modalSubtasks[i].text=inp.value.trim(); });
   const subtasks=modalSubtasks.filter(s=>s.text);
-  await patchTask(editingTaskId,{text,status,dueDate:due||null,tags,projectIds:pids,notes:notes||null,subtasks});
+  await patchTask(editingTaskId,{text,status,priority,dueDate:due||null,tags,projectIds:pids,notes:notes||null,subtasks});
   closeModal('modal-task'); toast('Saved');
 }
 
@@ -1429,6 +1462,13 @@ function renderKanban(){
       ${data.projects.map(p=>`<button class="chip ${kbProjFilters.has(p.id)?'active':''}" onclick="toggleKbProjFilter('${p.id}')">${esc(p.name)}</button>`).join('')}
     </div>
     <div class="kb-toolbar">
+      <span class="kb-toolbar-label">Priority:</span>
+      <button class="chip ${kbPriorityFilters.size===0?'active':''}" onclick="toggleKbPriorityFilter(null)">All</button>
+      ${Object.keys(PRIORITY_META).map(p=>`<button class="chip ${kbPriorityFilters.has(p)?'active':''}" onclick="toggleKbPriorityFilter('${p}')">${PRIORITY_META[p].label}</button>`).join('')}
+      <span style="flex:1"></span>
+      <button class="btn btn-ghost btn-sm ${kbSortByPriority?'active':''}" onclick="toggleKbSortByPriority()" title="Sort each column's cards by priority">⇅ Sort by Priority</button>
+    </div>
+    <div class="kb-toolbar">
       <span class="kb-toolbar-label">Columns:</span>
       ${data.columns.map(col=>`
         <button class="col-vis-chip ${hiddenCols.has(col.id)?'hidden':'visible'}" onclick="toggleColVisibility('${col.id}')">
@@ -1441,11 +1481,13 @@ function renderKanban(){
   // it belongs to ANY selected project (OR logic, same as the All Tasks
   // status filters). Tasks with no project at all always show, since
   // there's no project chip that could ever include them.
-  const tasks=data.tasks.filter(t=>kbProjFilters.size===0||!t.projectIds||t.projectIds.length===0||t.projectIds.some(pid=>kbProjFilters.has(pid)));
+  let tasks=data.tasks.filter(t=>kbProjFilters.size===0||!t.projectIds||t.projectIds.length===0||t.projectIds.some(pid=>kbProjFilters.has(pid)));
+  if(kbPriorityFilters.size) tasks=tasks.filter(t=>kbPriorityFilters.has(t.priority||''));
   const visibleCols=data.columns.filter(c=>!hiddenCols.has(c.id));
 
   let html=visibleCols.map(col=>{
-    const cards=tasks.filter(t=>t.status===col.id);
+    let cards=tasks.filter(t=>t.status===col.id);
+    if(kbSortByPriority) cards=[...cards].sort((a,b)=>priorityRank(b.priority)-priorityRank(a.priority));
     return `<div class="kanban-col" id="kbcol-${col.id}"
       draggable="true"
       ondragstart="colDragStart(event,'${col.id}')"
@@ -1467,6 +1509,7 @@ function renderKanban(){
             <div class="kc-text">${esc(t.text)}</div>
             ${t.notes?`<div style="font-size:11px;color:var(--muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(t.notes.slice(0,60))}</div>`:''}
             <div class="kc-meta">
+              ${priorityBadge(t.priority)}
               ${taskProjects(t).map(p=>`<span class="proj-tag" style="background:${p.color};font-size:10px;padding:1px 6px">${esc(p.name)}</span>`).join('')}
               ${t.dueDate?`<span class="due-tag ${isOverdue(t)?'overdue':isToday(t)?'today':''}">${fmtDate(t.dueDate)}</span>`:''}
               <button class="btn btn-ghost btn-sm" style="margin-left:auto;padding:2px 7px" onclick="openEditTask('${t.id}')">✏</button>
@@ -1503,6 +1546,13 @@ async function toggleKbProjFilter(id){
     await fetch(`${API}/settings`,{method:'PATCH',body:JSON.stringify({kanbanProjectFilter:[...kbProjFilters]}),headers:{'Content-Type':'application/json'}});
   }catch(e){ toast('Failed to save project filter'); }
 }
+function toggleKbPriorityFilter(p){
+  if(p===null){ kbPriorityFilters.clear(); }
+  else if(kbPriorityFilters.has(p)){ kbPriorityFilters.delete(p); }
+  else{ kbPriorityFilters.add(p); }
+  renderKanban();
+}
+function toggleKbSortByPriority(){ kbSortByPriority=!kbSortByPriority; renderKanban(); }
 
 // ── Task card drag (move between columns) ─────
 function kbDragStart(e,id){ e.stopPropagation(); dragTaskId=id; dragColId=null; e.target.classList.add('dragging') }
@@ -3052,6 +3102,7 @@ function habitRowHtml(h, days, today, isChild){
   return `<tr>
       <td class="hb-row-name ${isChild?'child':''}" onclick="openHabitDetail('${h.id}')">${caret}<span class="proj-dot" style="background:${h.color};margin-right:6px"></span>${esc(h.name)}${children.length?` <span style="color:var(--muted);font-weight:400;font-size:11px">(${children.length})</span>`:''}
         <button class="btn btn-ghost btn-sm" style="padding:1px 6px" title="Rename" onclick="event.stopPropagation();openEditHabitModal('${h.id}')">✏</button>
+        <button class="btn btn-ghost btn-sm" style="padding:1px 6px" title="Delete" onclick="event.stopPropagation();deleteHabit('${h.id}')">×</button>
       </td>
       <td><span class="hb-status ${st.status}">${st.label}</span></td>
       <td><span class="hb-pct ${tier}" title="${adherenceLabel(st.monthPct)} this month">${st.monthPct}%</span></td>
@@ -3244,12 +3295,14 @@ async function saveHabitModal(){
   await load();
   toast(editingHabitId?'Habit updated':'Habit created');
 }
-async function deleteHabit(){
-  if(!activeHabitId) return;
-  const h=habitById(activeHabitId);
-  if(!confirm(`Delete habit "${h?.name}"? This removes all its tracking history.`)) return;
-  await fetch(`${API}/habits/${activeHabitId}`,{method:'DELETE'});
-  activeHabitId=null;
+async function deleteHabit(id){
+  const targetId=id||activeHabitId; if(!targetId) return;
+  const h=habitById(targetId);
+  const children=data.habits.filter(x=>x.parentId===targetId);
+  const warn=children.length?` Its ${children.length} grouped habit(s) will become top-level (their own history is kept).`:'';
+  if(!confirm(`Delete habit "${h?.name}"? This removes all its tracking history.${warn}`)) return;
+  await fetch(`${API}/habits/${targetId}`,{method:'DELETE'});
+  if(activeHabitId===targetId) activeHabitId=null;
   await load();
   toast('Habit deleted');
 }
@@ -3288,11 +3341,12 @@ function renderTeams(){
   tbHiddenCols=new Set(board.hiddenColumnIds||[]);
   document.getElementById('tb-tab-board').classList.toggle('active', tbView==='board');
   document.getElementById('tb-tab-history').classList.toggle('active', tbView==='history');
+  document.getElementById('tb-history-count').textContent = `(${board.tasks.filter(t=>tbIsCompleted(board,t)).length})`;
   document.getElementById('tb-board-view').style.display = tbView==='board'?'':'none';
   document.getElementById('tb-history-view').style.display = tbView==='history'?'':'none';
   if(tbView==='board') renderTbBoard(); else renderTbHistory();
 }
-function selectTeamBoard(id){ tbActiveId=id; tbProjFilter=null; tbAssigneeFilter=null; renderTeams(); }
+function selectTeamBoard(id){ tbActiveId=id; tbProjFilter=null; tbAssigneeFilter=null; tbPriorityFilters=new Set(); renderTeams(); }
 function setTbView(v){ tbView=v; renderTeams(); }
 
 function renderTbBoard(){
@@ -3309,13 +3363,21 @@ function renderTbBoard(){
     <span class="kb-toolbar-label">Columns:</span>
     ${board.columns.map(col=>`<button class="col-vis-chip ${tbHiddenCols.has(col.id)?'hidden':'visible'}" onclick="toggleTbColVisibility('${col.id}')"><span style="width:8px;height:8px;border-radius:50%;background:${col.color};display:inline-block"></span>${esc(col.name)} ${tbHiddenCols.has(col.id)?'👁':'✓'}</button>`).join('')}`;
 
+  document.getElementById('tb-priority-row').innerHTML = `<span class="kb-toolbar-label">Priority:</span>
+    <button class="chip ${tbPriorityFilters.size===0?'active':''}" onclick="toggleTbPriorityFilter(null)">All</button>
+    ${Object.keys(PRIORITY_META).map(p=>`<button class="chip ${tbPriorityFilters.has(p)?'active':''}" onclick="toggleTbPriorityFilter('${p}')">${PRIORITY_META[p].label}</button>`).join('')}
+    <span style="flex:1"></span>
+    <button class="btn btn-ghost btn-sm ${tbSortByPriority?'active':''}" onclick="toggleTbSortByPriority()" title="Sort each column's cards by priority">⇅ Sort by Priority</button>`;
+
   let tasks=board.tasks;
   if(tbProjFilter) tasks=tasks.filter(t=>(t.projectIds||[]).includes(tbProjFilter));
   if(tbAssigneeFilter) tasks=tasks.filter(t=>(t.assigneeIds||[]).includes(tbAssigneeFilter));
+  if(tbPriorityFilters.size) tasks=tasks.filter(t=>tbPriorityFilters.has(t.priority||''));
   const visibleCols=board.columns.filter(c=>!tbHiddenCols.has(c.id));
 
   let html=visibleCols.map(col=>{
-    const cards=tasks.filter(t=>t.status===col.id);
+    let cards=tasks.filter(t=>t.status===col.id);
+    if(tbSortByPriority) cards=[...cards].sort((a,b)=>priorityRank(b.priority)-priorityRank(a.priority));
     return `<div class="kanban-col" id="tbcol-${col.id}"
       draggable="true"
       ondragstart="tbColDragStart(event,'${col.id}')"
@@ -3337,6 +3399,7 @@ function renderTbBoard(){
           return `<div class="kanban-card" draggable="true" ondragstart="tbDragStart(event,'${t.id}')" ondragend="tbDragEnd(event)" onclick="openEditTbTask('${t.id}')">
             <div class="kc-text">${esc(t.text)}${subs.length?` <span class="subtask-progress">${subs.filter(s=>s.done).length}/${subs.length} ✓</span>`:''}</div>
             <div class="kc-meta">
+              ${priorityBadge(t.priority)}
               ${assignees.length?assignees.map(a=>`<span class="proj-tag" style="background:${a.color}">${esc(a.name)}</span>`).join(''):`<span class="tag">Unassigned</span>`}
               ${projs.map(p=>`<span class="proj-tag" style="background:${p.color};font-size:10px;padding:1px 6px">${esc(p.name)}</span>`).join('')}
               ${t.dueDate?`<span class="due-tag ${isOverdue(t)?'overdue':isToday(t)?'today':''}">${fmtDate(t.dueDate)}</span>`:''}
@@ -3353,6 +3416,13 @@ function renderTbBoard(){
 }
 function setTbProjFilter(id){ tbProjFilter=id; renderTbBoard(); }
 function setTbAssigneeFilter(id){ tbAssigneeFilter=id; renderTbBoard(); }
+function toggleTbPriorityFilter(p){
+  if(p===null){ tbPriorityFilters.clear(); }
+  else if(tbPriorityFilters.has(p)){ tbPriorityFilters.delete(p); }
+  else{ tbPriorityFilters.add(p); }
+  renderTbBoard();
+}
+function toggleTbSortByPriority(){ tbSortByPriority=!tbSortByPriority; renderTbBoard(); }
 
 // ── Team task drag-and-drop ──────────────────────
 function tbDragStart(e,id){ e.stopPropagation(); tbDragTaskId=id; tbDragColId=null; e.target.classList.add('dragging'); }
@@ -3537,6 +3607,7 @@ function openNewTbTaskModal(){
   document.getElementById('tbt-title').textContent='New Task';
   document.getElementById('tbt-text').value='';
   document.getElementById('tbt-status').innerHTML=board.columns.map((c,i)=>`<option value="${c.id}" ${i===0?'selected':''}>${esc(c.name)}</option>`).join('');
+  document.getElementById('tbt-priority').value='';
   document.getElementById('tbt-assignee-list').innerHTML=board.members.length ? board.members.map(m=>`
     <label class="proj-check-item"><input type="checkbox" value="${m.id}" ${tbAssigneeFilter===m.id?'checked':''}/><span class="proj-dot" style="background:${m.color}"></span>${esc(m.name)}</label>`).join('') : `<div style="font-size:12px;color:var(--muted)">No members yet — add one via Manage Team.</div>`;
   document.getElementById('tbt-due').value='';
@@ -3553,6 +3624,7 @@ function openEditTbTask(id){
   document.getElementById('tbt-title').textContent='Edit Task';
   document.getElementById('tbt-text').value=t.text||'';
   document.getElementById('tbt-status').innerHTML=board.columns.map(c=>`<option value="${c.id}" ${t.status===c.id?'selected':''}>${esc(c.name)}</option>`).join('');
+  document.getElementById('tbt-priority').value=t.priority||'';
   document.getElementById('tbt-assignee-list').innerHTML=board.members.length ? board.members.map(m=>`
     <label class="proj-check-item"><input type="checkbox" value="${m.id}" ${(t.assigneeIds||[]).includes(m.id)?'checked':''}/><span class="proj-dot" style="background:${m.color}"></span>${esc(m.name)}</label>`).join('') : `<div style="font-size:12px;color:var(--muted)">No members yet — add one via Manage Team.</div>`;
   document.getElementById('tbt-due').value=t.dueDate?t.dueDate.slice(0,10):'';
@@ -3567,6 +3639,7 @@ async function saveTbTask(){
   const board=activeTeamBoard();
   const text=document.getElementById('tbt-text').value.trim(); if(!text){ toast('Enter task text'); return }
   const status=document.getElementById('tbt-status').value;
+  const priority=document.getElementById('tbt-priority').value||null;
   const assigneeIds=[...document.querySelectorAll('#tbt-assignee-list input:checked')].map(c=>c.value);
   const due=document.getElementById('tbt-due').value;
   const notes=document.getElementById('tbt-notes').value.trim();
@@ -3574,7 +3647,7 @@ async function saveTbTask(){
   const subInputs=document.querySelectorAll('#tbt-subtask-list .subtask-row input[type=text]');
   subInputs.forEach((inp,i)=>{ if(tbModalSubtasks[i]) tbModalSubtasks[i].text=inp.value.trim(); });
   const subtasks=tbModalSubtasks.filter(s=>s.text);
-  const payload={text,status,assigneeIds,dueDate:due||null,notes:notes||null,projectIds,subtasks};
+  const payload={text,status,priority,assigneeIds,dueDate:due||null,notes:notes||null,projectIds,subtasks};
   if(editingTbTaskId){
     await fetch(`${API}/teamboards/${board.id}/tasks/${editingTbTaskId}`,{method:'PATCH',body:JSON.stringify(payload),headers:{'Content-Type':'application/json'}});
   } else {
