@@ -98,6 +98,7 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
 .due-tag.overdue{background:#3d1515;color:var(--red)}
 .due-tag.today{background:#1d2d1a;color:var(--green)}
 .priority-badge{font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px;border:1px solid;white-space:nowrap}
+.urgency-badge{font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px;color:#1a1408;white-space:nowrap}
 .status-badge{font-size:10px;padding:2px 7px;border-radius:10px;text-transform:uppercase;letter-spacing:.5px}
 .status-todo{background:var(--surface3);color:var(--muted)}
 .status-inprogress{background:#1a2a3d;color:var(--accent)}
@@ -746,6 +747,7 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
         <div class="kb-toolbar" id="tb-assignee-row"></div>
         <div class="kb-toolbar" id="tb-project-row"></div>
         <div class="kb-toolbar" id="tb-priority-row"></div>
+        <div class="kb-toolbar" id="tb-urgency-row"></div>
         <div class="kanban-outer" id="tb-kanban-outer"></div>
       </div>
       <div id="tb-history-view" style="display:none">
@@ -787,6 +789,14 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
         <option value="low">Low</option>
         <option value="medium">Medium</option>
         <option value="high">High</option>
+      </select>
+    </div>
+    <div class="field"><label>Urgency</label>
+      <select id="mt-urgency">
+        <option value="">None</option>
+        <option value="low">Whenever</option>
+        <option value="medium">Soon</option>
+        <option value="high">Urgent</option>
       </select>
     </div>
     <div class="field"><label>Projects</label>
@@ -1063,6 +1073,14 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
         <option value="high">High</option>
       </select>
     </div>
+    <div class="field"><label>Urgency</label>
+      <select id="tbt-urgency">
+        <option value="">None</option>
+        <option value="low">Whenever</option>
+        <option value="medium">Soon</option>
+        <option value="high">Urgent</option>
+      </select>
+    </div>
     <div class="field"><label>Assignees</label><div class="proj-check-list" id="tbt-assignee-list"></div></div>
     <div class="field"><label>Projects</label><div class="proj-check-list" id="tbt-proj-list"></div></div>
     <div class="field"><label>Due Date</label><input id="tbt-due" type="date"/></div>
@@ -1128,8 +1146,25 @@ function priorityBadge(p){
   const m=PRIORITY_META[p]; if(!m) return '';
   return `<span class="priority-badge" style="color:${m.color};border-color:${m.color}">${m.label}</span>`;
 }
+
+// ── Task urgency ───────────────────────────────────────────────────
+// A second, independent axis from priority — priority is roughly "how
+// important", urgency is "how time-sensitive" (Eisenhower-matrix style:
+// a task can be high-priority but not urgent, or urgent but low-priority).
+// Filled badges (vs. priority's outlined ones) so the two read apart at a
+// glance when a card shows both.
+const URGENCY_META = {
+  high:   { label:'⏱ Urgent',      color:'#f97316', rank:3 },
+  medium: { label:'⏱ Soon',        color:'#facc15', rank:2 },
+  low:    { label:'⏱ Whenever',    color:'#64748b', rank:1 },
+};
+function urgencyRank(u){ return URGENCY_META[u]?.rank||0; }
+function urgencyBadge(u){
+  const m=URGENCY_META[u]; if(!m) return '';
+  return `<span class="urgency-badge" style="background:${m.color}">${m.label}</span>`;
+}
 let data = { columns: [], projects: [], tasks: [], mindmaps: [], habits: [], recurringEvents: [], diary: [] };
-let listFilters = new Set(), kbProjFilters = new Set(), kbPriorityFilters = new Set(), kbSortByPriority = false, pdFilter = 'all', pdProjectId = null;
+let listFilters = new Set(), kbProjFilters = new Set(), kbPriorityFilters = new Set(), kbSortByPriority = false, kbUrgencyFilters = new Set(), kbSortByUrgency = false, pdFilter = 'all', pdProjectId = null;
 let hiddenCols = new Set();   // column IDs hidden in kanban
 let dragColId = null;         // column being dragged (for reorder)
 let editingTaskId = null, dragTaskId = null;
@@ -1150,7 +1185,7 @@ let habitColor = COLORS[0], habitScheduleType = 'daily', habitScheduleDays = new
 let editingHabitId = null, activeHabitId = null, hbGridOffset = 0;
 let hbCalYear = new Date().getFullYear(), hbCalMonth = new Date().getMonth();
 // Team board state
-let tbActiveId = null, tbHiddenCols = new Set(), tbProjFilter = null, tbAssigneeFilter = null, tbPriorityFilters = new Set(), tbSortByPriority = false, tbView = 'board';
+let tbActiveId = null, tbHiddenCols = new Set(), tbProjFilter = null, tbAssigneeFilter = null, tbPriorityFilters = new Set(), tbSortByPriority = false, tbUrgencyFilters = new Set(), tbSortByUrgency = false, tbView = 'board';
 let tbDragTaskId = null, tbDragColId = null, editingTbTaskId = null, tbNewColColor = COLORS[0];
 // Export state
 let exportScope = 'personal', exportBoardId = null;
@@ -1421,6 +1456,7 @@ function openEditTask(id){
   // populate status select from columns
   document.getElementById('mt-status').innerHTML = data.columns.map(c=>`<option value="${c.id}" ${t.status===c.id?'selected':''}>${esc(c.name)}</option>`).join('');
   document.getElementById('mt-priority').value=t.priority||'';
+  document.getElementById('mt-urgency').value=t.urgency||'';
   document.getElementById('mt-due').value=t.dueDate?t.dueDate.slice(0,10):'';
   document.getElementById('mt-tags').value=(t.tags||[]).join(', ');
   document.getElementById('mt-notes').value=t.notes||'';
@@ -1439,6 +1475,7 @@ async function saveEditTask(){
   const text=document.getElementById('mt-text').value.trim(); if(!text) return;
   const status=document.getElementById('mt-status').value;
   const priority=document.getElementById('mt-priority').value||null;
+  const urgency=document.getElementById('mt-urgency').value||null;
   const due=document.getElementById('mt-due').value;
   const tags=document.getElementById('mt-tags').value.split(',').map(s=>s.trim()).filter(Boolean);
   const pids=[...document.querySelectorAll('#mt-proj-list input:checked')].map(i=>i.value);
@@ -1447,7 +1484,7 @@ async function saveEditTask(){
   const subInputs=document.querySelectorAll('#mt-subtask-list .subtask-row input[type=text]');
   subInputs.forEach((inp,i)=>{ if(modalSubtasks[i]) modalSubtasks[i].text=inp.value.trim(); });
   const subtasks=modalSubtasks.filter(s=>s.text);
-  await patchTask(editingTaskId,{text,status,priority,dueDate:due||null,tags,projectIds:pids,notes:notes||null,subtasks});
+  await patchTask(editingTaskId,{text,status,priority,urgency,dueDate:due||null,tags,projectIds:pids,notes:notes||null,subtasks});
   closeModal('modal-task'); toast('Saved');
 }
 
@@ -1469,6 +1506,13 @@ function renderKanban(){
       <button class="btn btn-ghost btn-sm ${kbSortByPriority?'active':''}" onclick="toggleKbSortByPriority()" title="Sort each column's cards by priority">⇅ Sort by Priority</button>
     </div>
     <div class="kb-toolbar">
+      <span class="kb-toolbar-label">Urgency:</span>
+      <button class="chip ${kbUrgencyFilters.size===0?'active':''}" onclick="toggleKbUrgencyFilter(null)">All</button>
+      ${Object.keys(URGENCY_META).map(u=>`<button class="chip ${kbUrgencyFilters.has(u)?'active':''}" onclick="toggleKbUrgencyFilter('${u}')">${URGENCY_META[u].label}</button>`).join('')}
+      <span style="flex:1"></span>
+      <button class="btn btn-ghost btn-sm ${kbSortByUrgency?'active':''}" onclick="toggleKbSortByUrgency()" title="Sort each column's cards by urgency">⇅ Sort by Urgency</button>
+    </div>
+    <div class="kb-toolbar">
       <span class="kb-toolbar-label">Columns:</span>
       ${data.columns.map(col=>`
         <button class="col-vis-chip ${hiddenCols.has(col.id)?'hidden':'visible'}" onclick="toggleColVisibility('${col.id}')">
@@ -1483,11 +1527,16 @@ function renderKanban(){
   // there's no project chip that could ever include them.
   let tasks=data.tasks.filter(t=>kbProjFilters.size===0||!t.projectIds||t.projectIds.length===0||t.projectIds.some(pid=>kbProjFilters.has(pid)));
   if(kbPriorityFilters.size) tasks=tasks.filter(t=>kbPriorityFilters.has(t.priority||''));
+  if(kbUrgencyFilters.size) tasks=tasks.filter(t=>kbUrgencyFilters.has(t.urgency||''));
   const visibleCols=data.columns.filter(c=>!hiddenCols.has(c.id));
 
   let html=visibleCols.map(col=>{
     let cards=tasks.filter(t=>t.status===col.id);
-    if(kbSortByPriority) cards=[...cards].sort((a,b)=>priorityRank(b.priority)-priorityRank(a.priority));
+    // If both sorts are on, priority wins the tie-break order (primary key)
+    // and urgency breaks ties within the same priority.
+    if(kbSortByPriority||kbSortByUrgency) cards=[...cards].sort((a,b)=>
+      (kbSortByPriority?priorityRank(b.priority)-priorityRank(a.priority):0) ||
+      (kbSortByUrgency?urgencyRank(b.urgency)-urgencyRank(a.urgency):0));
     return `<div class="kanban-col" id="kbcol-${col.id}"
       draggable="true"
       ondragstart="colDragStart(event,'${col.id}')"
@@ -1510,6 +1559,7 @@ function renderKanban(){
             ${t.notes?`<div style="font-size:11px;color:var(--muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(t.notes.slice(0,60))}</div>`:''}
             <div class="kc-meta">
               ${priorityBadge(t.priority)}
+              ${urgencyBadge(t.urgency)}
               ${taskProjects(t).map(p=>`<span class="proj-tag" style="background:${p.color};font-size:10px;padding:1px 6px">${esc(p.name)}</span>`).join('')}
               ${t.dueDate?`<span class="due-tag ${isOverdue(t)?'overdue':isToday(t)?'today':''}">${fmtDate(t.dueDate)}</span>`:''}
               <button class="btn btn-ghost btn-sm" style="margin-left:auto;padding:2px 7px" onclick="openEditTask('${t.id}')">✏</button>
@@ -1553,6 +1603,13 @@ function toggleKbPriorityFilter(p){
   renderKanban();
 }
 function toggleKbSortByPriority(){ kbSortByPriority=!kbSortByPriority; renderKanban(); }
+function toggleKbUrgencyFilter(u){
+  if(u===null){ kbUrgencyFilters.clear(); }
+  else if(kbUrgencyFilters.has(u)){ kbUrgencyFilters.delete(u); }
+  else{ kbUrgencyFilters.add(u); }
+  renderKanban();
+}
+function toggleKbSortByUrgency(){ kbSortByUrgency=!kbSortByUrgency; renderKanban(); }
 
 // ── Task card drag (move between columns) ─────
 function kbDragStart(e,id){ e.stopPropagation(); dragTaskId=id; dragColId=null; e.target.classList.add('dragging') }
@@ -3346,7 +3403,7 @@ function renderTeams(){
   document.getElementById('tb-history-view').style.display = tbView==='history'?'':'none';
   if(tbView==='board') renderTbBoard(); else renderTbHistory();
 }
-function selectTeamBoard(id){ tbActiveId=id; tbProjFilter=null; tbAssigneeFilter=null; tbPriorityFilters=new Set(); renderTeams(); }
+function selectTeamBoard(id){ tbActiveId=id; tbProjFilter=null; tbAssigneeFilter=null; tbPriorityFilters=new Set(); tbUrgencyFilters=new Set(); renderTeams(); }
 function setTbView(v){ tbView=v; renderTeams(); }
 
 function renderTbBoard(){
@@ -3369,15 +3426,24 @@ function renderTbBoard(){
     <span style="flex:1"></span>
     <button class="btn btn-ghost btn-sm ${tbSortByPriority?'active':''}" onclick="toggleTbSortByPriority()" title="Sort each column's cards by priority">⇅ Sort by Priority</button>`;
 
+  document.getElementById('tb-urgency-row').innerHTML = `<span class="kb-toolbar-label">Urgency:</span>
+    <button class="chip ${tbUrgencyFilters.size===0?'active':''}" onclick="toggleTbUrgencyFilter(null)">All</button>
+    ${Object.keys(URGENCY_META).map(u=>`<button class="chip ${tbUrgencyFilters.has(u)?'active':''}" onclick="toggleTbUrgencyFilter('${u}')">${URGENCY_META[u].label}</button>`).join('')}
+    <span style="flex:1"></span>
+    <button class="btn btn-ghost btn-sm ${tbSortByUrgency?'active':''}" onclick="toggleTbSortByUrgency()" title="Sort each column's cards by urgency">⇅ Sort by Urgency</button>`;
+
   let tasks=board.tasks;
   if(tbProjFilter) tasks=tasks.filter(t=>(t.projectIds||[]).includes(tbProjFilter));
   if(tbAssigneeFilter) tasks=tasks.filter(t=>(t.assigneeIds||[]).includes(tbAssigneeFilter));
   if(tbPriorityFilters.size) tasks=tasks.filter(t=>tbPriorityFilters.has(t.priority||''));
+  if(tbUrgencyFilters.size) tasks=tasks.filter(t=>tbUrgencyFilters.has(t.urgency||''));
   const visibleCols=board.columns.filter(c=>!tbHiddenCols.has(c.id));
 
   let html=visibleCols.map(col=>{
     let cards=tasks.filter(t=>t.status===col.id);
-    if(tbSortByPriority) cards=[...cards].sort((a,b)=>priorityRank(b.priority)-priorityRank(a.priority));
+    if(tbSortByPriority||tbSortByUrgency) cards=[...cards].sort((a,b)=>
+      (tbSortByPriority?priorityRank(b.priority)-priorityRank(a.priority):0) ||
+      (tbSortByUrgency?urgencyRank(b.urgency)-urgencyRank(a.urgency):0));
     return `<div class="kanban-col" id="tbcol-${col.id}"
       draggable="true"
       ondragstart="tbColDragStart(event,'${col.id}')"
@@ -3400,6 +3466,7 @@ function renderTbBoard(){
             <div class="kc-text">${esc(t.text)}${subs.length?` <span class="subtask-progress">${subs.filter(s=>s.done).length}/${subs.length} ✓</span>`:''}</div>
             <div class="kc-meta">
               ${priorityBadge(t.priority)}
+              ${urgencyBadge(t.urgency)}
               ${assignees.length?assignees.map(a=>`<span class="proj-tag" style="background:${a.color}">${esc(a.name)}</span>`).join(''):`<span class="tag">Unassigned</span>`}
               ${projs.map(p=>`<span class="proj-tag" style="background:${p.color};font-size:10px;padding:1px 6px">${esc(p.name)}</span>`).join('')}
               ${t.dueDate?`<span class="due-tag ${isOverdue(t)?'overdue':isToday(t)?'today':''}">${fmtDate(t.dueDate)}</span>`:''}
@@ -3423,6 +3490,13 @@ function toggleTbPriorityFilter(p){
   renderTbBoard();
 }
 function toggleTbSortByPriority(){ tbSortByPriority=!tbSortByPriority; renderTbBoard(); }
+function toggleTbUrgencyFilter(u){
+  if(u===null){ tbUrgencyFilters.clear(); }
+  else if(tbUrgencyFilters.has(u)){ tbUrgencyFilters.delete(u); }
+  else{ tbUrgencyFilters.add(u); }
+  renderTbBoard();
+}
+function toggleTbSortByUrgency(){ tbSortByUrgency=!tbSortByUrgency; renderTbBoard(); }
 
 // ── Team task drag-and-drop ──────────────────────
 function tbDragStart(e,id){ e.stopPropagation(); tbDragTaskId=id; tbDragColId=null; e.target.classList.add('dragging'); }
@@ -3608,6 +3682,7 @@ function openNewTbTaskModal(){
   document.getElementById('tbt-text').value='';
   document.getElementById('tbt-status').innerHTML=board.columns.map((c,i)=>`<option value="${c.id}" ${i===0?'selected':''}>${esc(c.name)}</option>`).join('');
   document.getElementById('tbt-priority').value='';
+  document.getElementById('tbt-urgency').value='';
   document.getElementById('tbt-assignee-list').innerHTML=board.members.length ? board.members.map(m=>`
     <label class="proj-check-item"><input type="checkbox" value="${m.id}" ${tbAssigneeFilter===m.id?'checked':''}/><span class="proj-dot" style="background:${m.color}"></span>${esc(m.name)}</label>`).join('') : `<div style="font-size:12px;color:var(--muted)">No members yet — add one via Manage Team.</div>`;
   document.getElementById('tbt-due').value='';
@@ -3625,6 +3700,7 @@ function openEditTbTask(id){
   document.getElementById('tbt-text').value=t.text||'';
   document.getElementById('tbt-status').innerHTML=board.columns.map(c=>`<option value="${c.id}" ${t.status===c.id?'selected':''}>${esc(c.name)}</option>`).join('');
   document.getElementById('tbt-priority').value=t.priority||'';
+  document.getElementById('tbt-urgency').value=t.urgency||'';
   document.getElementById('tbt-assignee-list').innerHTML=board.members.length ? board.members.map(m=>`
     <label class="proj-check-item"><input type="checkbox" value="${m.id}" ${(t.assigneeIds||[]).includes(m.id)?'checked':''}/><span class="proj-dot" style="background:${m.color}"></span>${esc(m.name)}</label>`).join('') : `<div style="font-size:12px;color:var(--muted)">No members yet — add one via Manage Team.</div>`;
   document.getElementById('tbt-due').value=t.dueDate?t.dueDate.slice(0,10):'';
@@ -3640,6 +3716,7 @@ async function saveTbTask(){
   const text=document.getElementById('tbt-text').value.trim(); if(!text){ toast('Enter task text'); return }
   const status=document.getElementById('tbt-status').value;
   const priority=document.getElementById('tbt-priority').value||null;
+  const urgency=document.getElementById('tbt-urgency').value||null;
   const assigneeIds=[...document.querySelectorAll('#tbt-assignee-list input:checked')].map(c=>c.value);
   const due=document.getElementById('tbt-due').value;
   const notes=document.getElementById('tbt-notes').value.trim();
@@ -3647,7 +3724,7 @@ async function saveTbTask(){
   const subInputs=document.querySelectorAll('#tbt-subtask-list .subtask-row input[type=text]');
   subInputs.forEach((inp,i)=>{ if(tbModalSubtasks[i]) tbModalSubtasks[i].text=inp.value.trim(); });
   const subtasks=tbModalSubtasks.filter(s=>s.text);
-  const payload={text,status,priority,assigneeIds,dueDate:due||null,notes:notes||null,projectIds,subtasks};
+  const payload={text,status,priority,urgency,assigneeIds,dueDate:due||null,notes:notes||null,projectIds,subtasks};
   if(editingTbTaskId){
     await fetch(`${API}/teamboards/${board.id}/tasks/${editingTbTaskId}`,{method:'PATCH',body:JSON.stringify(payload),headers:{'Content-Type':'application/json'}});
   } else {
