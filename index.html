@@ -322,7 +322,7 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
 /* Modal */
 .modal-overlay{position:fixed;inset:0;background:#0009;display:none;align-items:center;justify-content:center;z-index:100}
 .modal-overlay.open{display:flex}
-.modal{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:24px;width:440px;max-width:95vw;display:flex;flex-direction:column;gap:14px}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:24px;width:440px;max-width:95vw;display:flex;flex-direction:column;gap:14px;max-height:90vh;overflow-y:auto}
 .modal h3{font-size:15px;font-weight:600}
 .field{display:flex;flex-direction:column;gap:5px}
 .field label{font-size:12px;color:var(--muted)}
@@ -1185,7 +1185,7 @@ let habitColor = COLORS[0], habitScheduleType = 'daily', habitScheduleDays = new
 let editingHabitId = null, activeHabitId = null, hbGridOffset = 0;
 let hbCalYear = new Date().getFullYear(), hbCalMonth = new Date().getMonth();
 // Team board state
-let tbActiveId = null, tbHiddenCols = new Set(), tbProjFilter = null, tbAssigneeFilter = null, tbPriorityFilters = new Set(), tbSortByPriority = false, tbUrgencyFilters = new Set(), tbSortByUrgency = false, tbView = 'board';
+let tbActiveId = null, tbHiddenCols = new Set(), tbProjFilters = new Set(), tbAssigneeFilters = new Set(), tbPriorityFilters = new Set(), tbSortByPriority = false, tbUrgencyFilters = new Set(), tbSortByUrgency = false, tbView = 'board';
 let tbDragTaskId = null, tbDragColId = null, editingTbTaskId = null, tbNewColColor = COLORS[0];
 // Export state
 let exportScope = 'personal', exportBoardId = null;
@@ -3403,19 +3403,19 @@ function renderTeams(){
   document.getElementById('tb-history-view').style.display = tbView==='history'?'':'none';
   if(tbView==='board') renderTbBoard(); else renderTbHistory();
 }
-function selectTeamBoard(id){ tbActiveId=id; tbProjFilter=null; tbAssigneeFilter=null; tbPriorityFilters=new Set(); tbUrgencyFilters=new Set(); renderTeams(); }
+function selectTeamBoard(id){ tbActiveId=id; tbProjFilters=new Set(); tbAssigneeFilters=new Set(); tbPriorityFilters=new Set(); tbUrgencyFilters=new Set(); renderTeams(); }
 function setTbView(v){ tbView=v; renderTeams(); }
 
 function renderTbBoard(){
   const board=activeTeamBoard(); if(!board) return;
 
   document.getElementById('tb-assignee-row').innerHTML = `<span class="kb-toolbar-label">Assignee:</span>
-    <button class="chip ${!tbAssigneeFilter?'active':''}" onclick="setTbAssigneeFilter(null)">All</button>
-    ${board.members.map(m=>`<button class="chip ${tbAssigneeFilter===m.id?'active':''}" onclick="setTbAssigneeFilter('${m.id}')"><span class="proj-dot" style="background:${m.color}"></span> ${esc(m.name)}</button>`).join('')}`;
+    <button class="chip ${tbAssigneeFilters.size===0?'active':''}" onclick="toggleTbAssigneeFilter(null)">All</button>
+    ${board.members.map(m=>`<button class="chip ${tbAssigneeFilters.has(m.id)?'active':''}" onclick="toggleTbAssigneeFilter('${m.id}')"><span class="proj-dot" style="background:${m.color}"></span> ${esc(m.name)}</button>`).join('')}`;
 
   document.getElementById('tb-project-row').innerHTML = `<span class="kb-toolbar-label">Project:</span>
-    <button class="chip ${!tbProjFilter?'active':''}" onclick="setTbProjFilter(null)">All</button>
-    ${board.projects.map(p=>`<button class="chip ${tbProjFilter===p.id?'active':''}" onclick="setTbProjFilter('${p.id}')">${esc(p.name)}</button>`).join('')}
+    <button class="chip ${tbProjFilters.size===0?'active':''}" onclick="toggleTbProjFilter(null)">All</button>
+    ${board.projects.map(p=>`<button class="chip ${tbProjFilters.has(p.id)?'active':''}" onclick="toggleTbProjFilter('${p.id}')">${esc(p.name)}</button>`).join('')}
     <span style="flex:1"></span>
     <span class="kb-toolbar-label">Columns:</span>
     ${board.columns.map(col=>`<button class="col-vis-chip ${tbHiddenCols.has(col.id)?'hidden':'visible'}" onclick="toggleTbColVisibility('${col.id}')"><span style="width:8px;height:8px;border-radius:50%;background:${col.color};display:inline-block"></span>${esc(col.name)} ${tbHiddenCols.has(col.id)?'👁':'✓'}</button>`).join('')}`;
@@ -3432,9 +3432,12 @@ function renderTbBoard(){
     <span style="flex:1"></span>
     <button class="btn btn-ghost btn-sm ${tbSortByUrgency?'active':''}" onclick="toggleTbSortByUrgency()" title="Sort each column's cards by urgency">⇅ Sort by Urgency</button>`;
 
+  // Empty selection = show everything; otherwise a task shows if it
+  // matches ANY selected project/assignee (OR logic, same pattern as
+  // every other multi-select filter in the app).
   let tasks=board.tasks;
-  if(tbProjFilter) tasks=tasks.filter(t=>(t.projectIds||[]).includes(tbProjFilter));
-  if(tbAssigneeFilter) tasks=tasks.filter(t=>(t.assigneeIds||[]).includes(tbAssigneeFilter));
+  if(tbProjFilters.size) tasks=tasks.filter(t=>(t.projectIds||[]).some(pid=>tbProjFilters.has(pid)));
+  if(tbAssigneeFilters.size) tasks=tasks.filter(t=>(t.assigneeIds||[]).some(mid=>tbAssigneeFilters.has(mid)));
   if(tbPriorityFilters.size) tasks=tasks.filter(t=>tbPriorityFilters.has(t.priority||''));
   if(tbUrgencyFilters.size) tasks=tasks.filter(t=>tbUrgencyFilters.has(t.urgency||''));
   const visibleCols=board.columns.filter(c=>!tbHiddenCols.has(c.id));
@@ -3481,8 +3484,18 @@ function renderTbBoard(){
   html += `<div class="new-col-btn" onclick="openNewTbColumnModal()"><span style="font-size:22px">＋</span>Add Column</div>`;
   document.getElementById('tb-kanban-outer').innerHTML=html;
 }
-function setTbProjFilter(id){ tbProjFilter=id; renderTbBoard(); }
-function setTbAssigneeFilter(id){ tbAssigneeFilter=id; renderTbBoard(); }
+function toggleTbProjFilter(id){
+  if(id===null){ tbProjFilters.clear(); }
+  else if(tbProjFilters.has(id)){ tbProjFilters.delete(id); }
+  else{ tbProjFilters.add(id); }
+  renderTbBoard();
+}
+function toggleTbAssigneeFilter(id){
+  if(id===null){ tbAssigneeFilters.clear(); }
+  else if(tbAssigneeFilters.has(id)){ tbAssigneeFilters.delete(id); }
+  else{ tbAssigneeFilters.add(id); }
+  renderTbBoard();
+}
 function toggleTbPriorityFilter(p){
   if(p===null){ tbPriorityFilters.clear(); }
   else if(tbPriorityFilters.has(p)){ tbPriorityFilters.delete(p); }
@@ -3684,11 +3697,11 @@ function openNewTbTaskModal(){
   document.getElementById('tbt-priority').value='';
   document.getElementById('tbt-urgency').value='';
   document.getElementById('tbt-assignee-list').innerHTML=board.members.length ? board.members.map(m=>`
-    <label class="proj-check-item"><input type="checkbox" value="${m.id}" ${tbAssigneeFilter===m.id?'checked':''}/><span class="proj-dot" style="background:${m.color}"></span>${esc(m.name)}</label>`).join('') : `<div style="font-size:12px;color:var(--muted)">No members yet — add one via Manage Team.</div>`;
+    <label class="proj-check-item"><input type="checkbox" value="${m.id}" ${tbAssigneeFilters.has(m.id)?'checked':''}/><span class="proj-dot" style="background:${m.color}"></span>${esc(m.name)}</label>`).join('') : `<div style="font-size:12px;color:var(--muted)">No members yet — add one via Manage Team.</div>`;
   document.getElementById('tbt-due').value='';
   document.getElementById('tbt-notes').value='';
   document.getElementById('tbt-proj-list').innerHTML=board.projects.length ? board.projects.map(p=>`
-    <label class="proj-check-item"><input type="checkbox" value="${p.id}" ${tbProjFilter===p.id?'checked':''}/><span class="proj-dot" style="background:${p.color}"></span>${esc(p.name)}</label>`).join('') : `<div style="font-size:12px;color:var(--muted)">No projects yet — add one via Manage Team.</div>`;
+    <label class="proj-check-item"><input type="checkbox" value="${p.id}" ${tbProjFilters.has(p.id)?'checked':''}/><span class="proj-dot" style="background:${p.color}"></span>${esc(p.name)}</label>`).join('') : `<div style="font-size:12px;color:var(--muted)">No projects yet — add one via Manage Team.</div>`;
   tbModalSubtasks=[];
   renderTbModalSubtasks();
   openModal('modal-tb-task');
