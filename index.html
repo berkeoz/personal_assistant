@@ -193,6 +193,7 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
 .projects-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}
 .proj-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;cursor:pointer;transition:border-color .15s,box-shadow .15s}
 .proj-card:hover{border-color:var(--accent);box-shadow:0 2px 16px #0005}
+.proj-card.archived{opacity:.55}
 .proj-card-header{padding:14px 16px;display:flex;align-items:center;gap:10px}
 .proj-card-title{font-weight:600;font-size:14px;flex:1}
 .proj-card-bar{height:3px;background:var(--border)}
@@ -585,6 +586,7 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
       <span id="pd-dot" class="proj-dot" style="width:12px;height:12px"></span>
       <h2 id="pd-title" style="font-size:18px"></h2>
       <button class="btn btn-ghost btn-sm" onclick="renameCurrentProject()">Rename</button>
+      <button class="btn btn-ghost btn-sm" id="pd-archive-btn" onclick="toggleCurrentProjectArchived()">Archive</button>
       <button class="btn btn-danger btn-sm" onclick="deleteCurrentProject()">Delete Project</button>
     </div>
     <div class="add-row">
@@ -1240,7 +1242,7 @@ function buildMpickDD(ns){
   initMpick(ns);
   const dd = document.getElementById(ns+'-mpick-dd');
   if(!dd) return;
-  dd.innerHTML = data.projects.map(p=>`
+  dd.innerHTML = data.projects.filter(p=>!p.archived).map(p=>`
     <div class="mpick-option" onclick="toggleMpickItem('${ns}','${p.id}',this)">
       <input type="checkbox" id="mpck-${ns}-${p.id}" ${mpickState[ns].selected.has(p.id)?'checked':''}/>
       <span class="proj-dot" style="background:${p.color}"></span>
@@ -1357,7 +1359,7 @@ function renderView(name){
 
 // ── Sidebar ────────────────────────────────────
 function renderProjNav(){
-  document.getElementById('proj-nav').innerHTML = data.projects.map(p=>{
+  document.getElementById('proj-nav').innerHTML = data.projects.filter(p=>!p.archived).map(p=>{
     const cnt = data.tasks.filter(t=>(t.projectIds||[]).includes(p.id)).length;
     return `<button class="nav-btn" style="padding-left:18px;font-size:12px" onclick="openProject('${p.id}')">
       <span class="proj-dot" style="background:${p.color}"></span>${esc(p.name)}
@@ -1489,11 +1491,12 @@ function openEditTask(id){
   document.getElementById('mt-notes').value=t.notes||'';
   modalSubtasks=[...(t.subtasks||[]).map(s=>({...s}))];
   renderModalSubtasks();
-  // project checkboxes
-  document.getElementById('mt-proj-list').innerHTML = data.projects.map(p=>`
+  // project checkboxes — archived projects are hidden from new assignment,
+  // but still shown (so you can see/uncheck them) if this task already has one
+  document.getElementById('mt-proj-list').innerHTML = data.projects.filter(p=>!p.archived||(t.projectIds||[]).includes(p.id)).map(p=>`
     <label class="proj-check-item">
       <input type="checkbox" value="${p.id}" ${(t.projectIds||[]).includes(p.id)?'checked':''}/>
-      <span class="proj-dot" style="background:${p.color}"></span>${esc(p.name)}
+      <span class="proj-dot" style="background:${p.color}"></span>${esc(p.name)}${p.archived?' (archived)':''}
     </label>`).join('');
   openModal('modal-task');
 }
@@ -1523,7 +1526,7 @@ function renderKanban(){
     <div class="kb-toolbar">
       <span class="kb-toolbar-label">Projects:</span>
       <button class="chip ${kbProjFilters.size===0?'active':''}" onclick="toggleKbProjFilter(null)">All</button>
-      ${data.projects.map(p=>`<button class="chip ${kbProjFilters.has(p.id)?'active':''}" onclick="toggleKbProjFilter('${p.id}')">${esc(p.name)}</button>`).join('')}
+      ${data.projects.filter(p=>!p.archived).map(p=>`<button class="chip ${kbProjFilters.has(p.id)?'active':''}" onclick="toggleKbProjFilter('${p.id}')">${esc(p.name)}</button>`).join('')}
     </div>
     <div class="kb-toolbar">
       <span class="kb-toolbar-label">Priority:</span>
@@ -2030,13 +2033,12 @@ async function addCalTask(){
 document.getElementById('cal-task-text').addEventListener('keydown',e=>{ if(e.key==='Enter') addCalTask() });
 
 // ── Projects ───────────────────────────────────
-function renderProjects(){
-  document.getElementById('projects-grid').innerHTML=data.projects.map(p=>{
-    const tasks=data.tasks.filter(t=>(t.projectIds||[]).includes(p.id));
-    const done=tasks.filter(t=>t.status==='done').length;
-    const pct=tasks.length?Math.round(done/tasks.length*100):0;
-    return `<div class="proj-card" onclick="openProject('${p.id}')">
-      <div class="proj-card-header"><span class="proj-dot" style="background:${p.color}"></span><span class="proj-card-title">${esc(p.name)}</span></div>
+function projCardHTML(p){
+  const tasks=data.tasks.filter(t=>(t.projectIds||[]).includes(p.id));
+  const done=tasks.filter(t=>t.status==='done').length;
+  const pct=tasks.length?Math.round(done/tasks.length*100):0;
+  return `<div class="proj-card ${p.archived?'archived':''}" onclick="openProject('${p.id}')">
+      <div class="proj-card-header"><span class="proj-dot" style="background:${p.color}"></span><span class="proj-card-title">${esc(p.name)}</span>${p.archived?'<span class="tag" style="margin-left:auto">Archived</span>':''}</div>
       <div class="proj-card-bar"><div class="proj-card-fill" style="width:${pct}%;background:${p.color}"></div></div>
       <div class="proj-card-body"><div class="proj-card-stats">
         <span class="proj-stat"><strong>${tasks.length}</strong> tasks</span>
@@ -2044,15 +2046,22 @@ function renderProjects(){
         <span class="proj-stat"><strong>${pct}%</strong></span>
       </div></div>
     </div>`;
-  }).join('')+`<div class="new-proj-card" onclick="openNewProjectModal()"><span style="font-size:24px">＋</span>New Project</div>`;
+}
+function renderProjects(){
+  const active=data.projects.filter(p=>!p.archived);
+  const archived=data.projects.filter(p=>p.archived);
+  let html=active.map(projCardHTML).join('')+`<div class="new-proj-card" onclick="openNewProjectModal()"><span style="font-size:24px">＋</span>New Project</div>`;
+  if(archived.length) html+=`<div style="grid-column:1/-1;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin:10px 0 2px">Archived (${archived.length})</div>`+archived.map(projCardHTML).join('');
+  document.getElementById('projects-grid').innerHTML=html;
 }
 
 function openProject(id){ pdProjectId=id; pdFilter='all'; switchView('project-detail',null) }
 
 function renderProjectDetail(){
   const p=findProject(pdProjectId); if(!p) return;
-  document.getElementById('pd-title').textContent=p.name;
+  document.getElementById('pd-title').textContent=p.name+(p.archived?' (Archived)':'');
   document.getElementById('pd-dot').style.background=p.color;
+  document.getElementById('pd-archive-btn').textContent = p.archived?'Restore':'Archive';
   let tasks=data.tasks.filter(t=>(t.projectIds||[]).includes(pdProjectId));
   if(pdFilter==='todo') tasks=tasks.filter(t=>t.status==='todo');
   else if(pdFilter==='inprogress') tasks=tasks.filter(t=>t.status!=='todo'&&t.status!=='done');
@@ -2082,6 +2091,16 @@ async function deleteCurrentProject(){
   if(!confirm('Delete this project? Tasks will remain but lose this project tag.')) return;
   await fetch(`${API}/projects/${pdProjectId}`,{method:'DELETE'});
   await load(); switchView('projects',null); toast('Project deleted');
+}
+// Archiving (rather than deleting) keeps every task's project tag and
+// history intact — it just stops the project from being offered anywhere
+// new tasks get assigned (Kanban's filter chips, the task-edit project
+// checklist, the sidebar) without losing anything already tagged with it.
+async function toggleCurrentProjectArchived(){
+  const proj=findProject(pdProjectId); if(!proj) return;
+  await fetch(`${API}/projects/${pdProjectId}`,{method:'PATCH',body:JSON.stringify({archived:!proj.archived}),headers:{'Content-Type':'application/json'}});
+  await load();
+  toast(proj.archived?'Project restored':'Project archived');
 }
 
 // ── New Project Modal ──────────────────────────
@@ -3530,7 +3549,7 @@ function renderTbBoard(){
 
   document.getElementById('tb-project-row').innerHTML = `<span class="kb-toolbar-label">Project:</span>
     <button class="chip ${tbProjFilters.size===0?'active':''}" onclick="toggleTbProjFilter(null)">All</button>
-    ${board.projects.map(p=>`<button class="chip ${tbProjFilters.has(p.id)?'active':''}" onclick="toggleTbProjFilter('${p.id}')">${esc(p.name)}</button>`).join('')}
+    ${board.projects.filter(p=>!p.archived).map(p=>`<button class="chip ${tbProjFilters.has(p.id)?'active':''}" onclick="toggleTbProjFilter('${p.id}')">${esc(p.name)}</button>`).join('')}
     <span style="flex:1"></span>
     <span class="kb-toolbar-label">Columns:</span>
     ${board.columns.map(col=>`<button class="col-vis-chip ${tbHiddenCols.has(col.id)?'hidden':'visible'}" onclick="toggleTbColVisibility('${col.id}')"><span style="width:8px;height:8px;border-radius:50%;background:${col.color};display:inline-block"></span>${esc(col.name)} ${tbHiddenCols.has(col.id)?'👁':'✓'}</button>`).join('')}`;
@@ -3755,7 +3774,7 @@ function renderManageTeamModal(){
   document.getElementById('tb-manage-members').innerHTML = board.members.length ? board.members.map(m=>`
     <div class="subtask-row"><span class="proj-dot" style="background:${m.color}"></span><span style="flex:1;font-size:13px">${esc(m.name)}</span><button onclick="renameTbMember('${m.id}')" title="Rename">✏</button><button onclick="removeTbMember('${m.id}')" title="Remove">×</button></div>`).join('') : `<div style="font-size:12px;color:var(--muted)">No members yet.</div>`;
   document.getElementById('tb-manage-projects').innerHTML = board.projects.length ? board.projects.map(p=>`
-    <div class="subtask-row"><span class="proj-dot" style="background:${p.color}"></span><span style="flex:1;font-size:13px">${esc(p.name)}</span><button onclick="renameTbProject('${p.id}')" title="Rename">✏</button><button onclick="removeTbProject('${p.id}')" title="Remove">×</button></div>`).join('') : `<div style="font-size:12px;color:var(--muted)">No projects yet.</div>`;
+    <div class="subtask-row"><span class="proj-dot" style="background:${p.color}"></span><span style="flex:1;font-size:13px${p.archived?';color:var(--muted)':''}">${esc(p.name)}${p.archived?' (archived)':''}</span><button onclick="renameTbProject('${p.id}')" title="Rename">✏</button><button onclick="toggleTbProjectArchived('${p.id}')" title="${p.archived?'Restore':'Archive'}">${p.archived?'⤴':'🗄'}</button><button onclick="removeTbProject('${p.id}')" title="Remove">×</button></div>`).join('') : `<div style="font-size:12px;color:var(--muted)">No projects yet.</div>`;
 }
 async function renameTbMember(id){
   const board=activeTeamBoard(); const m=tbMemberById(board,id); if(!m) return;
@@ -3768,6 +3787,11 @@ async function renameTbProject(id){
   const name=prompt('Rename project',p.name); if(!name||!name.trim()||name.trim()===p.name) return;
   await fetch(`${API}/teamboards/${board.id}/projects/${id}`,{method:'PATCH',body:JSON.stringify({name:name.trim()}),headers:{'Content-Type':'application/json'}});
   await load(); renderManageTeamModal(); toast('Project renamed');
+}
+async function toggleTbProjectArchived(id){
+  const board=activeTeamBoard(); const p=tbProjectById(board,id); if(!p) return;
+  await fetch(`${API}/teamboards/${board.id}/projects/${id}`,{method:'PATCH',body:JSON.stringify({archived:!p.archived}),headers:{'Content-Type':'application/json'}});
+  await load(); renderManageTeamModal(); toast(p.archived?'Project restored':'Project archived');
 }
 async function addTbMember(){
   const input=document.getElementById('tb-new-member');
@@ -3815,7 +3839,7 @@ function openNewTbTaskModal(){
     <label class="proj-check-item"><input type="checkbox" value="${m.id}" ${tbAssigneeFilters.has(m.id)?'checked':''}/><span class="proj-dot" style="background:${m.color}"></span>${esc(m.name)}</label>`).join('') : `<div style="font-size:12px;color:var(--muted)">No members yet — add one via Manage Team.</div>`;
   document.getElementById('tbt-due').value='';
   document.getElementById('tbt-notes').value='';
-  document.getElementById('tbt-proj-list').innerHTML=board.projects.length ? board.projects.map(p=>`
+  document.getElementById('tbt-proj-list').innerHTML=board.projects.length ? board.projects.filter(p=>!p.archived).map(p=>`
     <label class="proj-check-item"><input type="checkbox" value="${p.id}" ${tbProjFilters.has(p.id)?'checked':''}/><span class="proj-dot" style="background:${p.color}"></span>${esc(p.name)}</label>`).join('') : `<div style="font-size:12px;color:var(--muted)">No projects yet — add one via Manage Team.</div>`;
   tbModalSubtasks=[];
   renderTbModalSubtasks();
@@ -3833,8 +3857,8 @@ function openEditTbTask(id){
     <label class="proj-check-item"><input type="checkbox" value="${m.id}" ${(t.assigneeIds||[]).includes(m.id)?'checked':''}/><span class="proj-dot" style="background:${m.color}"></span>${esc(m.name)}</label>`).join('') : `<div style="font-size:12px;color:var(--muted)">No members yet — add one via Manage Team.</div>`;
   document.getElementById('tbt-due').value=t.dueDate?t.dueDate.slice(0,10):'';
   document.getElementById('tbt-notes').value=t.notes||'';
-  document.getElementById('tbt-proj-list').innerHTML=board.projects.length ? board.projects.map(p=>`
-    <label class="proj-check-item"><input type="checkbox" value="${p.id}" ${(t.projectIds||[]).includes(p.id)?'checked':''}/><span class="proj-dot" style="background:${p.color}"></span>${esc(p.name)}</label>`).join('') : `<div style="font-size:12px;color:var(--muted)">No projects yet — add one via Manage Team.</div>`;
+  document.getElementById('tbt-proj-list').innerHTML=board.projects.length ? board.projects.filter(p=>!p.archived||(t.projectIds||[]).includes(p.id)).map(p=>`
+    <label class="proj-check-item"><input type="checkbox" value="${p.id}" ${(t.projectIds||[]).includes(p.id)?'checked':''}/><span class="proj-dot" style="background:${p.color}"></span>${esc(p.name)}${p.archived?' (archived)':''}</label>`).join('') : `<div style="font-size:12px;color:var(--muted)">No projects yet — add one via Manage Team.</div>`;
   tbModalSubtasks=[...(t.subtasks||[]).map(s=>({...s}))];
   renderTbModalSubtasks();
   openModal('modal-tb-task');
