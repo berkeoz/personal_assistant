@@ -231,6 +231,8 @@ export default async function handler(req, res) {
           entries: {},
           createdAt: new Date().toISOString().slice(0, 10),
           parentId: (body && body.parentId) || null,
+          trackValue: !!(body && body.trackValue),
+          valueUnit: (body && body.valueUnit) || null,
         };
         data.habits.push(habit);
         await saveData(data);
@@ -243,8 +245,18 @@ export default async function handler(req, res) {
         if (!date) return badRequest("Missing date");
         if (!habit) return notFound();
         if (!habit.entries) habit.entries = {};
-        if (habit.entries[date]) delete habit.entries[date];
-        else habit.entries[date] = true;
+        if (body && Object.prototype.hasOwnProperty.call(body, "value")) {
+          // Explicit value set/clear (value-tracking habits) — distinct from
+          // the plain toggle below since the caller already decided the
+          // outcome (e.g. a prompt() the user could cancel or blank out).
+          const v = body.value;
+          if (v === null || v === "" || v === undefined) delete habit.entries[date];
+          else habit.entries[date] = v;
+        } else if (habit.entries[date] !== undefined) {
+          delete habit.entries[date];
+        } else {
+          habit.entries[date] = true;
+        }
         await saveData(data);
         return ok(habit);
       }

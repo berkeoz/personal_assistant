@@ -292,7 +292,7 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
 .hb-row-name{text-align:left!important;white-space:nowrap;padding-right:10px!important;font-size:13px;font-weight:500;cursor:pointer;color:var(--text)}
 .hb-row-name:hover{color:var(--accent)}
 .hb-row-name.child{padding-left:24px!important;font-size:12px;color:var(--muted)}
-.hb-cell{width:22px;height:22px;border-radius:5px;cursor:pointer;background:var(--surface2);border:1px solid var(--border);transition:transform .1s}
+.hb-cell{width:22px;height:22px;border-radius:5px;cursor:pointer;background:var(--surface2);border:1px solid var(--border);transition:transform .1s;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:#0006;overflow:hidden;line-height:1}
 .hb-cell:hover{transform:scale(1.15)}
 .hb-cell.done{border-color:transparent}
 .hb-cell.unscheduled{opacity:.3;cursor:default}
@@ -934,6 +934,16 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
     <div class="field" id="mh-weekcount-field" style="display:none">
       <label>Times per week</label>
       <input id="mh-weekcount" type="number" min="1" max="7" value="3" style="max-width:100px"/>
+    </div>
+    <div class="field">
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;font-weight:400">
+        <input type="checkbox" id="mh-track-value" onchange="document.getElementById('mh-unit-field').style.display=this.checked?'':'none'"/>
+        Track a value each day (e.g. a measurement, weight, count)
+      </label>
+    </div>
+    <div class="field" id="mh-unit-field" style="display:none">
+      <label>Unit (optional)</label>
+      <input id="mh-unit" placeholder="e.g. cm, kg, reps…" style="max-width:150px"/>
     </div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeModal('modal-habit')">Cancel</button>
@@ -3021,7 +3031,7 @@ document.addEventListener('keydown', e=>{
 });
 
 // ── Habits ─────────────────────────────────────
-const HB_DAYS=21;
+const HB_DAYS=14;
 function habitById(id){ return data.habits.find(h=>h.id===id) }
 function isoDate(d){ const tz=d.getTimezoneOffset()*60000; return new Date(d-tz).toISOString().slice(0,10) }
 function isHabitScheduledOn(h, dateObj){
@@ -3180,14 +3190,18 @@ function habitRowHtml(h, days, today, isChild){
       ${days.map(d=>{
         const iso=isoDate(d);
         const scheduled=isHabitScheduledOn(h,d);
-        const done=!!h.entries[iso];
+        const val=h.entries[iso];
+        const done=!!val;
         const future=d>today;
         const cls=['hb-cell']; if(!scheduled) cls.push('unscheduled'); if(done) cls.push('done');
         const style=done?`background:${h.color}`:'';
         // Any past/today day can be marked, regardless of when the habit was
         // created — lets you backfill history from before you started tracking.
         const clickable=!future;
-        return `<td><div class="${cls.join(' ')}" style="${style}" ${clickable?`onclick="toggleHabitDay('${h.id}','${iso}')"`:''} title="${iso}"></div></td>`;
+        const handler=h.trackValue?'logHabitValue':'toggleHabitDay';
+        const label=(h.trackValue&&done&&val!==true)?esc(String(val)):'';
+        const tooltip=h.trackValue&&done&&val!==true?`${iso}: ${val}${h.valueUnit?' '+h.valueUnit:''}`:iso;
+        return `<td><div class="${cls.join(' ')}" style="${style}" ${clickable?`onclick="${handler}('${h.id}','${iso}')"`:''} title="${tooltip}">${label}</div></td>`;
       }).join('')}
     </tr>`
     + (collapsed ? '' : children.map(c=>habitRowHtml(c, days, today, true)).join(''));
@@ -3215,6 +3229,19 @@ function hbGridToday(){ hbGridOffset=0; renderHabitsGrid(); }
 
 async function toggleHabitDay(id, iso){
   await fetch(`${API}/habits/${id}/toggle`,{method:'POST',body:JSON.stringify({date:iso}),headers:{'Content-Type':'application/json'}});
+  await load();
+}
+// Value-tracking habits (e.g. "measure the belly") don't just mark a day
+// done — clicking prompts for the actual number/measurement, pre-filled
+// with whatever's already logged. Blanking it out clears that day.
+async function logHabitValue(id, iso){
+  const h=habitById(id); if(!h) return;
+  const existing=h.entries[iso];
+  const raw=prompt(`Value for ${iso}${h.valueUnit?` (${h.valueUnit})`:''}:`, existing!==undefined&&existing!==true?existing:'');
+  if(raw===null) return; // cancelled
+  const trimmed=raw.trim();
+  const value = trimmed==='' ? null : (isNaN(Number(trimmed)) ? trimmed : Number(trimmed));
+  await fetch(`${API}/habits/${id}/toggle`,{method:'POST',body:JSON.stringify({date:iso,value}),headers:{'Content-Type':'application/json'}});
   await load();
 }
 
@@ -3269,15 +3296,18 @@ function renderHbCalendar(h){
     // the habit's effective start just show plain, since there's nothing to
     // judge, but they're still clickable so you can backfill them.
     const judged = !(start && d<start) && isHabitScheduledOn(h,d);
-    const done=!!h.entries[iso];
+    const val=h.entries[iso];
+    const done=!!val;
     const future=d>today;
     let cls='cal-cell'+(isToday?' today':'');
     if(done) cls+=' hb-done';
     else if(judged && !future) cls+=' hb-missed';
     const clickable = !future && isHabitScheduledOn(h,d);
-    return `<div class="${cls}" ${clickable?`onclick="toggleHabitDay('${h.id}','${iso}')" style="cursor:pointer"`:''}>
+    const handler=h.trackValue?'logHabitValue':'toggleHabitDay';
+    const mark = done ? (h.trackValue && val!==true ? esc(String(val)) : '✅') : (future?'':(judged?'✖':''));
+    return `<div class="${cls}" ${clickable?`onclick="${handler}('${h.id}','${iso}')" style="cursor:pointer"`:''}>
       <div class="cal-num">${c.day}</div>
-      ${isHabitScheduledOn(h,d)?`<div style="font-size:14px">${done?'✅':(future?'':(judged?'✖':''))}</div>`:''}
+      ${isHabitScheduledOn(h,d)?`<div style="font-size:${h.trackValue&&done&&val!==true?'12px':'14px'}">${mark}</div>`:''}
     </div>`;
   }).join('');
 }
@@ -3321,6 +3351,9 @@ function openNewHabitModal(){
   document.getElementById('mh-weekcount-field').style.display='none';
   document.getElementById('mh-weekcount').value=3;
   document.getElementById('mh-color-row').innerHTML=COLORS.map(c=>`<div class="color-swatch ${c===habitColor?'selected':''}" style="background:${c}" onclick="selectHabitColor('${c}',this)"></div>`).join('');
+  document.getElementById('mh-track-value').checked=false;
+  document.getElementById('mh-unit-field').style.display='none';
+  document.getElementById('mh-unit').value='';
   buildWeekdayPicker();
   buildHabitParentPicker(null, null);
   openModal('modal-habit');
@@ -3338,6 +3371,9 @@ function openEditHabitModal(id){
   document.getElementById('mh-weekcount-field').style.display = habitScheduleType==='weekly_count'?'':'none';
   document.getElementById('mh-weekcount').value=h.schedule?.timesPerWeek||3;
   document.getElementById('mh-color-row').innerHTML=COLORS.map(c=>`<div class="color-swatch ${c===habitColor?'selected':''}" style="background:${c}" onclick="selectHabitColor('${c}',this)"></div>`).join('');
+  document.getElementById('mh-track-value').checked=!!h.trackValue;
+  document.getElementById('mh-unit-field').style.display=h.trackValue?'':'none';
+  document.getElementById('mh-unit').value=h.valueUnit||'';
   buildWeekdayPicker();
   buildHabitParentPicker(h.id, h.parentId||null);
   openModal('modal-habit');
@@ -3355,7 +3391,9 @@ async function saveHabitModal(){
   if(schedule.type==='weekly' && schedule.days.length===0){ toast('Pick at least one day'); return }
   const parentField=document.getElementById('mh-parent-field');
   const parentId = parentField.style.display==='none' ? undefined : (document.getElementById('mh-parent').value || null);
-  const body = { name, color:habitColor, schedule };
+  const trackValue=document.getElementById('mh-track-value').checked;
+  const valueUnit=document.getElementById('mh-unit').value.trim()||null;
+  const body = { name, color:habitColor, schedule, trackValue, valueUnit };
   if(parentId!==undefined) body.parentId = parentId;
   if(editingHabitId){
     await fetch(`${API}/habits/${editingHabitId}`,{method:'PATCH',body:JSON.stringify(body),headers:{'Content-Type':'application/json'}});
