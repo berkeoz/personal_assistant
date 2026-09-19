@@ -295,6 +295,8 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
 .hb-cell{width:22px;height:22px;border-radius:5px;cursor:pointer;background:var(--surface2);border:1px solid var(--border);transition:transform .1s;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:#0006;overflow:hidden;line-height:1}
 .hb-cell:hover{transform:scale(1.15)}
 .hb-cell.done{border-color:transparent}
+.hb-cell.skip{background:var(--surface3);color:var(--muted);border-style:dashed}
+.hb-cell.fail{background:#3d1515;color:var(--red);border-color:transparent}
 .hb-cell.unscheduled{opacity:.3;cursor:default}
 .hb-cell.unscheduled:hover{transform:none}
 .hb-status{font-size:10px;padding:2px 7px;border-radius:10px;white-space:nowrap}
@@ -315,6 +317,7 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
 .hb-stat .val{font-size:20px;font-weight:700}
 .cal-cell.hb-done{background:#1a3028}
 .cal-cell.hb-missed{background:#3d1515}
+.cal-cell.hb-skip{background:var(--surface3)}
 .weekday-picker{display:flex;gap:6px}
 .weekday-chip{width:34px;height:34px;border-radius:50%;border:1px solid var(--border);background:var(--surface2);color:var(--muted);cursor:pointer;font-size:11px;display:flex;align-items:center;justify-content:center;transition:all .15s;user-select:none}
 .weekday-chip.selected{background:var(--accent);border-color:var(--accent);color:#fff}
@@ -3034,6 +3037,23 @@ document.addEventListener('keydown', e=>{
 const HB_DAYS=14;
 function habitById(id){ return data.habits.find(h=>h.id===id) }
 function isoDate(d){ const tz=d.getTimezoneOffset()*60000; return new Date(d-tz).toISOString().slice(0,10) }
+// A habit's entry for a given day is one of:
+//  - undefined         → not logged
+//  - true               → done (plain boolean habit)
+//  - <number|string>    → done, with a tracked value (trackValue habit)
+//  - {s:'skip'}         → explicitly skipped — neutral: doesn't break a
+//                         streak and is excluded from the adherence % entirely
+//  - {s:'fail'}         → explicitly failed — counts against you same as an
+//                         unlogged day, but was a deliberate call rather than
+//                         just not having gotten to it yet
+function habitEntryState(h, iso){
+  const v=h.entries?.[iso];
+  if(v===undefined) return null;
+  if(v && typeof v==='object' && v.s) return v.s;
+  return 'done';
+}
+function habitIsDone(h, iso){ return habitEntryState(h,iso)==='done'; }
+function habitIsSkipped(h, iso){ return habitEntryState(h,iso)==='skip'; }
 function isHabitScheduledOn(h, dateObj){
   if(!h.schedule || h.schedule.type==='daily' || h.schedule.type==='weekly_count') return true;
   return (h.schedule.days||[]).includes(dateObj.getDay());
@@ -3054,24 +3074,34 @@ function habitCurrentStreak(h){
   const today=new Date(); today.setHours(0,0,0,0);
   const start=habitEffectiveStart(h);
   let d=new Date(today);
-  if(isHabitScheduledOn(h,d) && !h.entries[isoDate(d)]) d.setDate(d.getDate()-1);
+  // Today isn't over yet, so an unlogged (or skipped) today shouldn't read
+  // as broken — start judging from yesterday instead. An explicit 'fail'
+  // today, though, is a deliberate call and does count immediately.
+  if(isHabitScheduledOn(h,d)){
+    const st0=habitEntryState(h,isoDate(d));
+    if(st0===null||st0==='skip') d.setDate(d.getDate()-1);
+  }
   let streak=0;
   for(let i=0;i<3650;i++){
     if(start && d<start) break;
     if(isHabitScheduledOn(h,d)){
-      if(h.entries[isoDate(d)]) streak++;
-      else break;
+      const st=habitEntryState(h,isoDate(d));
+      if(st==='done') streak++;
+      else if(st!=='skip') break; // null or 'fail' — skip is neutral, keeps walking
     }
     d.setDate(d.getDate()-1);
   }
   return streak;
 }
-function lastScheduledBefore(h, dateExclusive){
+// Walks back to the most recent prior scheduled day, skipping past any
+// explicitly-skipped ones — used for the on-track/off-track call, since a
+// skip shouldn't itself read as "off track".
+function lastJudgedDayBefore(h, dateExclusive){
   const start=habitEffectiveStart(h);
   let d=new Date(dateExclusive); d.setDate(d.getDate()-1);
   for(let i=0;i<400;i++){
     if(start && d<start) return null;
-    if(isHabitScheduledOn(h,d)) return d;
+    if(isHabitScheduledOn(h,d) && habitEntryState(h,isoDate(d))!=='skip') return d;
     d.setDate(d.getDate()-1);
   }
   return null;
@@ -3080,7 +3110,7 @@ function lastScheduledBefore(h, dateExclusive){
 function weekStartOf(d){ const w=new Date(d); w.setDate(w.getDate()-w.getDay()); w.setHours(0,0,0,0); return w }
 function habitWeekCount(h, weekStart){
   let count=0;
-  for(let i=0;i<7;i++){ const d=new Date(weekStart); d.setDate(d.getDate()+i); if(h.entries[isoDate(d)]) count++; }
+  for(let i=0;i<7;i++){ const d=new Date(weekStart); d.setDate(d.getDate()+i); if(habitIsDone(h,isoDate(d))) count++; }
   return count;
 }
 function habitStatsWeeklyCount(h){
@@ -3113,7 +3143,7 @@ function habitStatsWeeklyCount(h){
   const weeksElapsed=Math.max(1,Math.ceil(today.getDate()/7));
   const y=today.getFullYear(), m=today.getMonth();
   let doneThisMonth=0;
-  for(let day=1; day<=today.getDate(); day++){ if(h.entries[isoDate(new Date(y,m,day))]) doneThisMonth++; }
+  for(let day=1; day<=today.getDate(); day++){ if(habitIsDone(h,isoDate(new Date(y,m,day)))) doneThisMonth++; }
   const monthPct=Math.min(100, Math.round(doneThisMonth/(target*weeksElapsed)*100));
   return { streak, best, monthPct, status, label, weekCount:curCount, weekTarget:target };
 }
@@ -3127,7 +3157,8 @@ function habitStats(h){
     let d=parseDate(allDates[0]);
     while(d<=today){
       if(isHabitScheduledOn(h,d)){
-        if(h.entries[isoDate(d)]){ run++; best=Math.max(best,run) } else run=0;
+        const st=habitEntryState(h,isoDate(d));
+        if(st==='done'){ run++; best=Math.max(best,run) } else if(st!=='skip') run=0;
       }
       d=new Date(d); d.setDate(d.getDate()+1);
     }
@@ -3135,20 +3166,27 @@ function habitStats(h){
   best=Math.max(best,streak);
   const y=today.getFullYear(), m=today.getMonth();
   const start=habitEffectiveStart(h);
+  // Skipped days are excluded entirely from the percentage (neither
+  // scheduled-count nor done-count) rather than counting against you.
   let schedCount=0, doneCount=0;
   for(let day=1; day<=today.getDate(); day++){
     const d=new Date(y,m,day);
     if(start && d<start) continue;
-    if(isHabitScheduledOn(h,d)){ schedCount++; if(h.entries[isoDate(d)]) doneCount++; }
+    if(isHabitScheduledOn(h,d)){
+      const st=habitEntryState(h,isoDate(d));
+      if(st==='skip') continue;
+      schedCount++;
+      if(st==='done') doneCount++;
+    }
   }
   const monthPct = schedCount? Math.round(doneCount/schedCount*100) : 0;
   let status='new', label='New';
-  const lastSched=lastScheduledBefore(h,today);
-  if(lastSched){
-    const wasDone=!!h.entries[isoDate(lastSched)];
+  const lastJudged=lastJudgedDayBefore(h,today);
+  if(lastJudged){
+    const wasDone=habitIsDone(h,isoDate(lastJudged));
     status = wasDone ? 'on' : 'off';
     label = wasDone ? 'On track' : 'Off track';
-  } else if(isHabitScheduledOn(h,today) && h.entries[isoDate(today)]){
+  } else if(isHabitScheduledOn(h,today) && habitIsDone(h,isoDate(today))){
     status='on'; label='On track';
   }
   return { streak, best, monthPct, status, label };
@@ -3191,16 +3229,18 @@ function habitRowHtml(h, days, today, isChild){
         const iso=isoDate(d);
         const scheduled=isHabitScheduledOn(h,d);
         const val=h.entries[iso];
-        const done=!!val;
+        const entryState=habitEntryState(h,iso);
         const future=d>today;
-        const cls=['hb-cell']; if(!scheduled) cls.push('unscheduled'); if(done) cls.push('done');
-        const style=done?`background:${h.color}`:'';
+        const cls=['hb-cell']; if(!scheduled) cls.push('unscheduled');
+        if(entryState) cls.push(entryState==='done'?'done':entryState);
+        const style=entryState==='done'?`background:${h.color}`:'';
         // Any past/today day can be marked, regardless of when the habit was
         // created — lets you backfill history from before you started tracking.
         const clickable=!future;
-        const handler=h.trackValue?'logHabitValue':'toggleHabitDay';
-        const label=(h.trackValue&&done&&val!==true)?esc(String(val)):'';
-        const tooltip=h.trackValue&&done&&val!==true?`${iso}: ${val}${h.valueUnit?' '+h.valueUnit:''}`:iso;
+        const handler=h.trackValue?'logHabitValue':'cycleHabitDay';
+        const label = entryState==='skip'?'–' : entryState==='fail'?'✕' : (h.trackValue&&entryState==='done'&&val!==true)?esc(String(val)):'';
+        const tooltip = entryState==='skip'?`${iso}: Skipped` : entryState==='fail'?`${iso}: Failed`
+          : (h.trackValue&&entryState==='done'&&val!==true)?`${iso}: ${val}${h.valueUnit?' '+h.valueUnit:''}` : iso;
         return `<td><div class="${cls.join(' ')}" style="${style}" ${clickable?`onclick="${handler}('${h.id}','${iso}')"`:''} title="${tooltip}">${label}</div></td>`;
       }).join('')}
     </tr>`
@@ -3227,20 +3267,38 @@ function renderHabitsGrid(){
 function hbGridNav(dir){ hbGridOffset=Math.max(0,hbGridOffset+dir); renderHabitsGrid(); }
 function hbGridToday(){ hbGridOffset=0; renderHabitsGrid(); }
 
-async function toggleHabitDay(id, iso){
-  await fetch(`${API}/habits/${id}/toggle`,{method:'POST',body:JSON.stringify({date:iso}),headers:{'Content-Type':'application/json'}});
+// Clicking a plain (non-value) habit's day cell cycles through the four
+// states: not logged → Done → Skipped → Failed → not logged. Skip and
+// fail are equally one click away as done, since "I want to be able to
+// say I failed or skipped" needs to be at least as easy as marking done.
+async function cycleHabitDay(id, iso){
+  const h=habitById(id); if(!h) return;
+  const order=[null,true,{s:'skip'},{s:'fail'}];
+  const idx=order.findIndex(v=>{
+    if(v===null) return habitEntryState(h,iso)===null;
+    if(v===true) return habitEntryState(h,iso)==='done';
+    return habitEntryState(h,iso)===v.s;
+  });
+  const value=order[(idx+1)%order.length];
+  await fetch(`${API}/habits/${id}/toggle`,{method:'POST',body:JSON.stringify({date:iso,value}),headers:{'Content-Type':'application/json'}});
   await load();
 }
 // Value-tracking habits (e.g. "measure the belly") don't just mark a day
 // done — clicking prompts for the actual number/measurement, pre-filled
-// with whatever's already logged. Blanking it out clears that day.
+// with whatever's already logged. Blanking it out clears that day; typing
+// "skip" or "fail" records that instead of a number.
 async function logHabitValue(id, iso){
   const h=habitById(id); if(!h) return;
-  const existing=h.entries[iso];
-  const raw=prompt(`Value for ${iso}${h.valueUnit?` (${h.valueUnit})`:''}:`, existing!==undefined&&existing!==true?existing:'');
+  const st=habitEntryState(h,iso);
+  const existing = st==='done' ? h.entries[iso] : (st==='skip'||st==='fail') ? st : '';
+  const raw=prompt(`Value for ${iso}${h.valueUnit?` (${h.valueUnit})`:''} — or type "skip"/"fail":`, existing);
   if(raw===null) return; // cancelled
   const trimmed=raw.trim();
-  const value = trimmed==='' ? null : (isNaN(Number(trimmed)) ? trimmed : Number(trimmed));
+  let value;
+  if(trimmed==='') value=null;
+  else if(/^skip$/i.test(trimmed)) value={s:'skip'};
+  else if(/^fail(ed)?$/i.test(trimmed)) value={s:'fail'};
+  else value = isNaN(Number(trimmed)) ? trimmed : Number(trimmed);
   await fetch(`${API}/habits/${id}/toggle`,{method:'POST',body:JSON.stringify({date:iso,value}),headers:{'Content-Type':'application/json'}});
   await load();
 }
@@ -3297,14 +3355,19 @@ function renderHbCalendar(h){
     // judge, but they're still clickable so you can backfill them.
     const judged = !(start && d<start) && isHabitScheduledOn(h,d);
     const val=h.entries[iso];
-    const done=!!val;
+    const entryState=habitEntryState(h,iso);
+    const done=entryState==='done';
     const future=d>today;
     let cls='cal-cell'+(isToday?' today':'');
     if(done) cls+=' hb-done';
+    else if(entryState==='skip') cls+=' hb-skip';
+    else if(entryState==='fail') cls+=' hb-missed';
     else if(judged && !future) cls+=' hb-missed';
     const clickable = !future && isHabitScheduledOn(h,d);
-    const handler=h.trackValue?'logHabitValue':'toggleHabitDay';
-    const mark = done ? (h.trackValue && val!==true ? esc(String(val)) : '✅') : (future?'':(judged?'✖':''));
+    const handler=h.trackValue?'logHabitValue':'cycleHabitDay';
+    const mark = entryState==='skip' ? '–' : entryState==='fail' ? '✕'
+      : done ? (h.trackValue && val!==true ? esc(String(val)) : '✅')
+      : (future?'':(judged?'✖':''));
     return `<div class="${cls}" ${clickable?`onclick="${handler}('${h.id}','${iso}')" style="cursor:pointer"`:''}>
       <div class="cal-num">${c.day}</div>
       ${isHabitScheduledOn(h,d)?`<div style="font-size:${h.trackValue&&done&&val!==true?'12px':'14px'}">${mark}</div>`:''}
