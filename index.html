@@ -390,6 +390,16 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
 .week-task.overdue-wt{border-left-color:var(--red)}
 .week-task .wt-proj{font-size:10px;color:var(--muted);margin-top:3px}
 .week-empty{font-size:11px;color:var(--surface3);text-align:center;padding:12px 0}
+/* 7 equal columns squeezed into a phone width made the Week view's task
+   chips barely legible and the Diary's free-text entries unreadable
+   (letters wrapping one per line) — stack into one full-width column
+   per day instead, scrolling vertically like an agenda. Placed after
+   the unconditional .week-grid rule above so it actually wins the
+   cascade on mobile instead of being overridden by it. */
+@media (max-width:768px){
+  .week-grid{grid-template-columns:1fr}
+  .week-header{flex-wrap:wrap}
+}
 
 /* Diary */
 .diary-entry{background:var(--surface2);border-radius:6px;padding:6px 8px;font-size:12px;display:flex;align-items:flex-start;gap:6px}
@@ -1414,14 +1424,18 @@ function setListFilter(f,btn){
 }
 function matchesListFilter(t,f){
   if(f==='todo') return t.status==='todo';
-  if(f==='inprogress') return t.status!=='todo'&&t.status!=='done';
-  if(f==='done') return t.status==='done';
+  if(f==='inprogress') return t.status!=='todo'&&!isCompleted(t);
+  if(f==='done') return isCompleted(t);
   if(f==='overdue') return isOverdue(t);
   return false;
 }
 function renderList(){
-  let tasks=data.tasks;
-  if(listFilters.size>0) tasks=tasks.filter(t=>[...listFilters].some(f=>matchesListFilter(t,f)));
+  // "All" (no filter selected) deliberately excludes completed/archived
+  // tasks — they already have a home in History, and otherwise pile up
+  // here indefinitely. Explicitly check "Done" to bring them back.
+  let tasks = listFilters.size>0
+    ? data.tasks.filter(t=>[...listFilters].some(f=>matchesListFilter(t,f)))
+    : data.tasks.filter(t=>!isCompleted(t));
   document.getElementById('task-list').innerHTML = tasks.length ? tasks.map(taskItemHTML).join('') : `<div class="empty">No tasks here.</div>`;
   buildMpickDD('li');
 }
