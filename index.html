@@ -930,6 +930,9 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
         <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="radio" name="mh-sched" value="daily" checked onchange="setHabitScheduleType('daily')"/> Every day</label>
         <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="radio" name="mh-sched" value="weekly" onchange="setHabitScheduleType('weekly')"/> Specific days</label>
         <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="radio" name="mh-sched" value="weekly_count" onchange="setHabitScheduleType('weekly_count')"/> N times a week</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="radio" name="mh-sched" value="monthly" onchange="setHabitScheduleType('monthly')"/> Monthly</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="radio" name="mh-sched" value="yearly" onchange="setHabitScheduleType('yearly')"/> Yearly</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="radio" name="mh-sched" value="custom" onchange="setHabitScheduleType('custom')"/> Custom</label>
       </div>
     </div>
     <div class="field" id="mh-weekday-field" style="display:none">
@@ -939,6 +942,35 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
     <div class="field" id="mh-weekcount-field" style="display:none">
       <label>Times per week</label>
       <input id="mh-weekcount" type="number" min="1" max="7" value="3" style="max-width:100px"/>
+    </div>
+    <div class="field" id="mh-monthday-field" style="display:none">
+      <label>Day of month</label>
+      <input id="mh-monthday" type="number" min="1" max="31" value="1" style="max-width:100px"/>
+    </div>
+    <div class="field" id="mh-yearly-field" style="display:none">
+      <label>Every year on</label>
+      <div style="display:flex;gap:8px;align-items:center">
+        <select id="mh-yearly-month" class="mm-select" style="max-width:150px">
+          <option value="1">January</option><option value="2">February</option><option value="3">March</option>
+          <option value="4">April</option><option value="5">May</option><option value="6">June</option>
+          <option value="7">July</option><option value="8">August</option><option value="9">September</option>
+          <option value="10">October</option><option value="11">November</option><option value="12">December</option>
+        </select>
+        <input id="mh-yearly-day" type="number" min="1" max="31" value="1" style="max-width:80px"/>
+      </div>
+    </div>
+    <div class="field" id="mh-custom-field" style="display:none">
+      <label>Repeat every</label>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <input id="mh-custom-count" type="number" min="1" max="365" value="2" style="max-width:80px"/>
+        <select id="mh-custom-unit" class="mm-select" style="max-width:130px">
+          <option value="days">Day(s)</option>
+          <option value="weeks" selected>Week(s)</option>
+          <option value="months">Month(s)</option>
+        </select>
+        <span style="color:var(--muted);font-size:12px">starting</span>
+        <input id="mh-custom-start" type="date" style="max-width:170px"/>
+      </div>
     </div>
     <div class="field">
       <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;font-weight:400">
@@ -1762,10 +1794,13 @@ document.getElementById('sc-text').addEventListener('keydown',e=>{ if(e.key==='E
 // Deliberately NOT tasks: no status/checkbox, never counted in task stats.
 // Shown read-only on Calendar/Today/Week so you can see them alongside
 // your tasks without them cluttering the task lists.
-function isEventScheduledOn(ev, dateObj){
-  const r=ev.recurrence||{type:'daily'};
-  if(r.type==='once') return r.date===isoDate(dateObj);
-  if(r.endDate && dateObj>parseDate(r.endDate)) return false;
+// Shared day-matching engine for any {type,days,day,month,intervalCount,
+// intervalUnit,startDate}-shaped recurrence rule — used by both habit.schedule
+// and event.recurrence, so "daily/weekly/monthly/yearly/custom interval"
+// behaves identically everywhere in the app instead of two parallel copies
+// silently drifting apart.
+function isRuleScheduledOn(rule, dateObj){
+  const r=rule||{type:'daily'};
   if(r.type==='weekly') return (r.days||[]).includes(dateObj.getDay());
   if(r.type==='monthly') return dateObj.getDate()===(r.day||1);
   if(r.type==='yearly') return (dateObj.getMonth()+1)===(r.month||1) && dateObj.getDate()===(r.day||1);
@@ -1783,7 +1818,13 @@ function isEventScheduledOn(ev, dateObj){
     }
     return false;
   }
-  return true; // daily
+  return true; // daily (or an unrecognized type — safest default)
+}
+function isEventScheduledOn(ev, dateObj){
+  const r=ev.recurrence||{type:'daily'};
+  if(r.type==='once') return r.date===isoDate(dateObj);
+  if(r.endDate && dateObj>parseDate(r.endDate)) return false;
+  return isRuleScheduledOn(r, dateObj);
 }
 function eventsOnDate(dateObj){ return data.recurringEvents.filter(ev=>isEventScheduledOn(ev,dateObj)); }
 function eventsOnDateStr(dateStr){ return eventsOnDate(new Date(dateStr+'T00:00:00')); }
@@ -3074,8 +3115,9 @@ function habitEntryState(h, iso){
 function habitIsDone(h, iso){ return habitEntryState(h,iso)==='done'; }
 function habitIsSkipped(h, iso){ return habitEntryState(h,iso)==='skip'; }
 function isHabitScheduledOn(h, dateObj){
-  if(!h.schedule || h.schedule.type==='daily' || h.schedule.type==='weekly_count') return true;
-  return (h.schedule.days||[]).includes(dateObj.getDay());
+  if(!h.schedule) return true;
+  if(h.schedule.type==='weekly_count') return true; // judged as a weekly total, not per-day
+  return isRuleScheduledOn(h.schedule, dateObj);
 }
 function habitCreatedDate(h){ return h.createdAt ? parseDate(h.createdAt) : null }
 // The boundary before which we don't judge/penalize missed days. Normally the
@@ -3407,6 +3449,9 @@ function setHabitScheduleType(type){
   habitScheduleType=type;
   document.getElementById('mh-weekday-field').style.display = type==='weekly' ? '' : 'none';
   document.getElementById('mh-weekcount-field').style.display = type==='weekly_count' ? '' : 'none';
+  document.getElementById('mh-monthday-field').style.display = type==='monthly' ? '' : 'none';
+  document.getElementById('mh-yearly-field').style.display = type==='yearly' ? '' : 'none';
+  document.getElementById('mh-custom-field').style.display = type==='custom' ? '' : 'none';
 }
 // Only top-level habits (no parentId of their own) can be picked as a
 // group parent — keeps nesting to a single level, like task subtasks.
@@ -3432,6 +3477,15 @@ function openNewHabitModal(){
   document.getElementById('mh-weekday-field').style.display='none';
   document.getElementById('mh-weekcount-field').style.display='none';
   document.getElementById('mh-weekcount').value=3;
+  document.getElementById('mh-monthday-field').style.display='none';
+  document.getElementById('mh-monthday').value=1;
+  document.getElementById('mh-yearly-field').style.display='none';
+  document.getElementById('mh-yearly-month').value=String(new Date().getMonth()+1);
+  document.getElementById('mh-yearly-day').value=new Date().getDate();
+  document.getElementById('mh-custom-field').style.display='none';
+  document.getElementById('mh-custom-count').value=2;
+  document.getElementById('mh-custom-unit').value='weeks';
+  document.getElementById('mh-custom-start').value=new Date().toISOString().slice(0,10);
   document.getElementById('mh-color-row').innerHTML=COLORS.map(c=>`<div class="color-swatch ${c===habitColor?'selected':''}" style="background:${c}" onclick="selectHabitColor('${c}',this)"></div>`).join('');
   document.getElementById('mh-track-value').checked=false;
   document.getElementById('mh-unit-field').style.display='none';
@@ -3452,6 +3506,15 @@ function openEditHabitModal(id){
   document.getElementById('mh-weekday-field').style.display = habitScheduleType==='weekly'?'':'none';
   document.getElementById('mh-weekcount-field').style.display = habitScheduleType==='weekly_count'?'':'none';
   document.getElementById('mh-weekcount').value=h.schedule?.timesPerWeek||3;
+  document.getElementById('mh-monthday-field').style.display = habitScheduleType==='monthly'?'':'none';
+  document.getElementById('mh-monthday').value=h.schedule?.day||1;
+  document.getElementById('mh-yearly-field').style.display = habitScheduleType==='yearly'?'':'none';
+  document.getElementById('mh-yearly-month').value=String(h.schedule?.month||1);
+  document.getElementById('mh-yearly-day').value=h.schedule?.day||1;
+  document.getElementById('mh-custom-field').style.display = habitScheduleType==='custom'?'':'none';
+  document.getElementById('mh-custom-count').value=h.schedule?.intervalCount||2;
+  document.getElementById('mh-custom-unit').value=h.schedule?.intervalUnit||'weeks';
+  document.getElementById('mh-custom-start').value=h.schedule?.startDate||new Date().toISOString().slice(0,10);
   document.getElementById('mh-color-row').innerHTML=COLORS.map(c=>`<div class="color-swatch ${c===habitColor?'selected':''}" style="background:${c}" onclick="selectHabitColor('${c}',this)"></div>`).join('');
   document.getElementById('mh-track-value').checked=!!h.trackValue;
   document.getElementById('mh-unit-field').style.display=h.trackValue?'':'none';
@@ -3469,6 +3532,19 @@ async function saveHabitModal(){
   else if(habitScheduleType==='weekly_count'){
     const n=Math.max(1,Math.min(7,parseInt(document.getElementById('mh-weekcount').value,10)||3));
     schedule={ type:'weekly_count', timesPerWeek:n };
+  } else if(habitScheduleType==='monthly'){
+    const day=Math.max(1,Math.min(31,parseInt(document.getElementById('mh-monthday').value,10)||1));
+    schedule={ type:'monthly', day };
+  } else if(habitScheduleType==='yearly'){
+    const month=Math.max(1,Math.min(12,parseInt(document.getElementById('mh-yearly-month').value,10)||1));
+    const day=Math.max(1,Math.min(31,parseInt(document.getElementById('mh-yearly-day').value,10)||1));
+    schedule={ type:'yearly', month, day };
+  } else if(habitScheduleType==='custom'){
+    const startDate=document.getElementById('mh-custom-start').value;
+    if(!startDate){ toast('Pick a start date'); return }
+    const intervalCount=Math.max(1,Math.min(365,parseInt(document.getElementById('mh-custom-count').value,10)||1));
+    const intervalUnit=document.getElementById('mh-custom-unit').value;
+    schedule={ type:'custom', intervalCount, intervalUnit, startDate };
   } else schedule={ type:'daily' };
   if(schedule.type==='weekly' && schedule.days.length===0){ toast('Pick at least one day'); return }
   const parentField=document.getElementById('mh-parent-field');
