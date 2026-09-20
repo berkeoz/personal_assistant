@@ -707,6 +707,7 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
         <button class="btn btn-ghost btn-sm" onclick="openEditHabitModal()">Edit</button>
         <button class="btn btn-danger btn-sm" onclick="deleteHabit()">Delete</button>
       </div>
+      <div id="hbd-desc" style="display:none;white-space:pre-wrap;color:var(--muted);font-size:13px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:12px"></div>
       <div class="hb-stat-row">
         <div class="hb-stat" id="hbd-week-stat" style="display:none"><div class="lbl">This Week</div><div class="val" id="hbd-week">–</div></div>
         <div class="hb-stat"><div class="lbl" id="hbd-streak-lbl">Current Streak</div><div class="val" id="hbd-streak">–</div></div>
@@ -919,6 +920,7 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
   <div class="modal">
     <h3 id="mh-title">New Habit</h3>
     <div class="field"><label>Name</label><input id="mh-name" placeholder="e.g. Drink water, Read, Meditate…"/></div>
+    <div class="field"><label>Description (optional)</label><textarea id="mh-desc" rows="4" placeholder="Notes, checklist, instructions…" style="width:100%;resize:vertical;font-family:inherit"></textarea></div>
     <div class="field" id="mh-parent-field"><label>Group under</label>
       <select id="mh-parent" class="mm-select" style="width:100%;max-width:none">
         <option value="">— None (top-level) —</option>
@@ -3372,6 +3374,9 @@ function renderHabitDetail(){
   if(!h){ activeHabitId=null; renderHabits(); return }
   document.getElementById('hbd-dot').style.background=h.color;
   document.getElementById('hbd-title').textContent=h.name;
+  const descEl=document.getElementById('hbd-desc');
+  descEl.style.display=h.description?'':'none';
+  descEl.textContent=h.description||'';
   const st=habitStats(h);
   const isWeekly=h.schedule?.type==='weekly_count';
   document.getElementById('hbd-status').textContent=st.label;
@@ -3470,6 +3475,7 @@ function openNewHabitModal(){
   editingHabitId=null;
   document.getElementById('mh-title').textContent='New Habit';
   document.getElementById('mh-name').value='';
+  document.getElementById('mh-desc').value='';
   habitColor=COLORS[data.habits.length % COLORS.length];
   habitScheduleType='daily';
   habitScheduleDays=new Set([1,2,3,4,5]);
@@ -3499,6 +3505,7 @@ function openEditHabitModal(id){
   editingHabitId=h.id;
   document.getElementById('mh-title').textContent='Edit Habit';
   document.getElementById('mh-name').value=h.name;
+  document.getElementById('mh-desc').value=h.description||'';
   habitColor=h.color;
   habitScheduleType=h.schedule?.type||'daily';
   habitScheduleDays=new Set(h.schedule?.days||[1,2,3,4,5]);
@@ -3527,6 +3534,7 @@ function selectHabitColor(c,el){ habitColor=c; document.querySelectorAll('#mh-co
 async function saveHabitModal(){
   const name=document.getElementById('mh-name').value.trim();
   if(!name){ toast('Enter a habit name'); return }
+  const description=document.getElementById('mh-desc').value.trim();
   let schedule;
   if(habitScheduleType==='weekly') schedule={ type:'weekly', days:[...habitScheduleDays].sort() };
   else if(habitScheduleType==='weekly_count'){
@@ -3551,7 +3559,7 @@ async function saveHabitModal(){
   const parentId = parentField.style.display==='none' ? undefined : (document.getElementById('mh-parent').value || null);
   const trackValue=document.getElementById('mh-track-value').checked;
   const valueUnit=document.getElementById('mh-unit').value.trim()||null;
-  const body = { name, color:habitColor, schedule, trackValue, valueUnit };
+  const body = { name, description, color:habitColor, schedule, trackValue, valueUnit };
   if(parentId!==undefined) body.parentId = parentId;
   if(editingHabitId){
     await fetch(`${API}/habits/${editingHabitId}`,{method:'PATCH',body:JSON.stringify(body),headers:{'Content-Type':'application/json'}});

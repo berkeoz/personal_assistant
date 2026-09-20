@@ -226,6 +226,7 @@ export default async function handler(req, res) {
         const habit = {
           id: crypto.randomUUID(),
           name: (body && body.name) || "Untitled Habit",
+          description: (body && body.description) || "",
           color: (body && body.color) || "#6c8eff",
           schedule: (body && body.schedule) || { type: "daily" },
           entries: {},
