@@ -470,6 +470,7 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
   <button class="nav-btn" onclick="switchView('mindmap',this)" data-view="mindmap"><span class="ic">🧠</span> Mind Map</button>
   <button class="nav-btn" onclick="switchView('habits',this)" data-view="habits"><span class="ic">🔁</span> Habits</button>
   <button class="nav-btn" onclick="switchView('diary',this)" data-view="diary"><span class="ic">📔</span> Diary</button>
+  <button class="nav-btn" onclick="switchView('workdiary',this)" data-view="workdiary"><span class="ic">💼</span> Work Diary</button>
   <button class="nav-btn" onclick="switchView('history',this)" data-view="history"><span class="ic">🕘</span> History</button>
   <button class="nav-btn" onclick="switchView('teams',this)" data-view="teams"><span class="ic">👥</span> Teams</button>
   <button class="nav-btn" onclick="openImportModal()" style="color:var(--accent2)"><span class="ic">📥</span> Import .ics</button>
@@ -644,17 +645,34 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
   <div class="view" id="view-diary">
     <div class="week-header" id="diary-header">
       <span id="diary-week-nav" style="display:flex;align-items:center;gap:10px">
-        <button class="week-nav" onclick="diaryNav(-1)">‹</button>
+        <button class="week-nav" onclick="diaryNav('diary',-1)">‹</button>
         <h3 id="diary-title"></h3>
-        <button class="week-nav" onclick="diaryNav(1)">›</button>
-        <button class="week-today-btn" onclick="diaryGoToday()">This Week</button>
+        <button class="week-nav" onclick="diaryNav('diary',1)">›</button>
+        <button class="week-today-btn" onclick="diaryGoToday('diary')">This Week</button>
       </span>
       <span id="diary-insights-title" style="display:none;font-weight:600;font-size:15px">📊 What I generally do, by day of week</span>
       <span style="flex:1"></span>
-      <button class="btn btn-ghost btn-sm" id="diary-insights-btn" onclick="toggleDiaryInsights()">📊 Insights</button>
+      <button class="btn btn-ghost btn-sm" id="diary-insights-btn" onclick="toggleDiaryInsights('diary')">📊 Insights</button>
     </div>
     <div class="week-grid" id="diary-grid"></div>
     <div id="diary-insights" style="display:none"></div>
+  </div>
+
+  <!-- Work Diary -->
+  <div class="view" id="view-workdiary">
+    <div class="week-header" id="workdiary-header">
+      <span id="workdiary-week-nav" style="display:flex;align-items:center;gap:10px">
+        <button class="week-nav" onclick="diaryNav('work',-1)">‹</button>
+        <h3 id="workdiary-title"></h3>
+        <button class="week-nav" onclick="diaryNav('work',1)">›</button>
+        <button class="week-today-btn" onclick="diaryGoToday('work')">This Week</button>
+      </span>
+      <span id="workdiary-insights-title" style="display:none;font-weight:600;font-size:15px">📊 What I generally do, by day of week</span>
+      <span style="flex:1"></span>
+      <button class="btn btn-ghost btn-sm" id="workdiary-insights-btn" onclick="toggleDiaryInsights('work')">📊 Insights</button>
+    </div>
+    <div class="week-grid" id="workdiary-grid"></div>
+    <div id="workdiary-insights" style="display:none"></div>
   </div>
 
   <!-- Search -->
@@ -1222,7 +1240,7 @@ function urgencyBadge(u){
   const m=URGENCY_META[u]; if(!m) return '';
   return `<span class="urgency-badge" style="background:${m.color}">${m.label}</span>`;
 }
-let data = { columns: [], projects: [], tasks: [], mindmaps: [], habits: [], recurringEvents: [], diary: [] };
+let data = { columns: [], projects: [], tasks: [], mindmaps: [], habits: [], recurringEvents: [], diary: [], workDiary: [] };
 let listFilters = new Set(), kbProjFilters = new Set(), kbPriorityFilters = new Set(), kbSortByPriority = false, kbUrgencyFilters = new Set(), kbSortByUrgency = false, pdFilter = 'all', pdProjectId = null;
 let hiddenCols = new Set();   // column IDs hidden in kanban
 let dragColId = null;         // column being dragged (for reorder)
@@ -1334,6 +1352,7 @@ async function load(){
   if(!data.teamBoards) data.teamBoards=[];
   if(!data.recurringEvents) data.recurringEvents=[];
   if(!data.diary) data.diary=[];
+  if(!data.workDiary) data.workDiary=[];
   hiddenCols = new Set(data.settings.kanbanHiddenCols||[]);
   kbProjFilters = new Set(data.settings.kanbanProjectFilter||[]);
   renderAll();
@@ -1386,7 +1405,8 @@ function renderView(name){
   else if(name==='summary') renderSummary();
   else if(name==='mindmap') renderMindMap();
   else if(name==='habits') renderHabits();
-  else if(name==='diary') renderDiary();
+  else if(name==='diary') renderDiary('diary');
+  else if(name==='workdiary') renderDiary('work');
   else if(name==='history') renderHistory();
   else if(name==='teams') renderTeams();
 }
@@ -2408,41 +2428,51 @@ function renderWeek(){
 // entries down as you go; Insights aggregates every entry ever logged,
 // grouped by weekday name, so patterns ("what do I usually do on
 // Mondays?") emerge once enough weeks have piled up.
-let diaryWeekOffset=0, diaryInsightsOn=false;
+// Two independent logs share this same engine: the personal 'diary' and
+// the 'work' Work Diary, kept as separate KV arrays/API resources so
+// entries never mix, distinguished only by the `kind` passed around here
+// (also doubles as the DOM id / API path prefix, 'diary' vs 'workdiary').
+let diaryState={ diary:{weekOffset:0,insightsOn:false}, work:{weekOffset:0,insightsOn:false} };
+function diaryList(kind){ return kind==='work' ? data.workDiary : data.diary; }
+function diaryApiPath(kind){ return kind==='work' ? 'workdiary' : 'diary'; }
+function diaryPrefix(kind){ return kind==='work' ? 'workdiary' : 'diary'; }
 function diaryWeekStart(offset=0){
   const d=new Date(); d.setHours(0,0,0,0);
   const day=d.getDay();
   d.setDate(d.getDate()-day+1+(offset*7)); // Monday start, same as Week view
   return d;
 }
-function diaryNav(dir){ diaryWeekOffset+=dir; renderDiary(); }
-function diaryGoToday(){ diaryWeekOffset=0; renderDiary(); }
-function diaryEntriesOn(dateStr){
-  return data.diary.filter(e=>e.date===dateStr)
+function diaryNav(kind,dir){ diaryState[kind].weekOffset+=dir; renderDiary(kind); }
+function diaryGoToday(kind){ diaryState[kind].weekOffset=0; renderDiary(kind); }
+function diaryEntriesOn(kind,dateStr){
+  return diaryList(kind).filter(e=>e.date===dateStr)
     .sort((a,b)=>(a.time||'99:99').localeCompare(b.time||'99:99')||(a.createdAt||'').localeCompare(b.createdAt||''));
 }
-function toggleDiaryInsights(){
-  diaryInsightsOn=!diaryInsightsOn;
-  document.getElementById('diary-insights-btn').classList.toggle('active',diaryInsightsOn);
-  document.getElementById('diary-week-nav').style.display=diaryInsightsOn?'none':'flex';
-  document.getElementById('diary-insights-title').style.display=diaryInsightsOn?'':'none';
-  document.getElementById('diary-grid').style.display=diaryInsightsOn?'none':'';
-  document.getElementById('diary-insights').style.display=diaryInsightsOn?'':'none';
-  renderDiary();
+function toggleDiaryInsights(kind){
+  const st=diaryState[kind];
+  st.insightsOn=!st.insightsOn;
+  const p=diaryPrefix(kind);
+  document.getElementById(`${p}-insights-btn`).classList.toggle('active',st.insightsOn);
+  document.getElementById(`${p}-week-nav`).style.display=st.insightsOn?'none':'flex';
+  document.getElementById(`${p}-insights-title`).style.display=st.insightsOn?'':'none';
+  document.getElementById(`${p}-grid`).style.display=st.insightsOn?'none':'';
+  document.getElementById(`${p}-insights`).style.display=st.insightsOn?'':'none';
+  renderDiary(kind);
 }
-function renderDiary(){
-  if(diaryInsightsOn){ renderDiaryInsights(); return; }
-  const mon=diaryWeekStart(diaryWeekOffset);
+function renderDiary(kind){
+  const st=diaryState[kind], p=diaryPrefix(kind);
+  if(st.insightsOn){ renderDiaryInsights(kind); return; }
+  const mon=diaryWeekStart(st.weekOffset);
   const sun=new Date(mon); sun.setDate(sun.getDate()+6);
-  document.getElementById('diary-title').textContent=
+  document.getElementById(`${p}-title`).textContent=
     mon.toLocaleDateString('en-US',{month:'short',day:'numeric'})+' – '+
     sun.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
   const todayStr=new Date().toISOString().slice(0,10);
   const dayNames=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
-  document.getElementById('diary-grid').innerHTML=dayNames.map((dayName,i)=>{
+  document.getElementById(`${p}-grid`).innerHTML=dayNames.map((dayName,i)=>{
     const d=new Date(mon); d.setDate(d.getDate()+i);
     const dateStr=d.toISOString().slice(0,10);
-    const entries=diaryEntriesOn(dateStr);
+    const entries=diaryEntriesOn(kind,dateStr);
     const isToday=dateStr===todayStr;
     return `<div class="week-col ${isToday?'is-today':''}">
       <div class="week-col-header">
@@ -2452,40 +2482,41 @@ function renderDiary(){
       <div class="week-col-tasks">
         ${entries.length?entries.map(e=>`
           <div class="diary-entry">
-            <span class="diary-entry-text" onclick="editDiaryEntry('${e.id}')" title="Click to edit">${e.time?`<b>${fmtTimeOnly(e.time)}</b> `:''}${esc(e.text)}</span>
-            <button class="task-del" onclick="deleteDiaryEntry('${e.id}')">×</button>
+            <span class="diary-entry-text" onclick="editDiaryEntry('${kind}','${e.id}')" title="Click to edit">${e.time?`<b>${fmtTimeOnly(e.time)}</b> `:''}${esc(e.text)}</span>
+            <button class="task-del" onclick="deleteDiaryEntry('${kind}','${e.id}')">×</button>
           </div>`).join(''):`<div class="week-empty">—</div>`}
       </div>
-      <div class="diary-add-row"><input type="text" placeholder="What did you do…" onkeydown="diaryQuickAdd(event,'${dateStr}')"/></div>
+      <div class="diary-add-row"><input type="text" placeholder="What did you do…" onkeydown="diaryQuickAdd(event,'${kind}','${dateStr}')"/></div>
     </div>`;
   }).join('');
 }
-async function diaryQuickAdd(e,dateStr){
+async function diaryQuickAdd(e,kind,dateStr){
   if(e.key!=='Enter') return;
   const text=e.target.value.trim(); if(!text) return;
-  await fetch(`${API}/diary`,{method:'POST',body:JSON.stringify({date:dateStr,text}),headers:{'Content-Type':'application/json'}});
+  await fetch(`${API}/${diaryApiPath(kind)}`,{method:'POST',body:JSON.stringify({date:dateStr,text}),headers:{'Content-Type':'application/json'}});
   e.target.value='';
   await load();
 }
-async function deleteDiaryEntry(id){
-  await fetch(`${API}/diary/${id}`,{method:'DELETE'});
+async function deleteDiaryEntry(kind,id){
+  await fetch(`${API}/${diaryApiPath(kind)}/${id}`,{method:'DELETE'});
   await load();
 }
-async function editDiaryEntry(id){
-  const entry=data.diary.find(e=>e.id===id); if(!entry) return;
+async function editDiaryEntry(kind,id){
+  const entry=diaryList(kind).find(e=>e.id===id); if(!entry) return;
   const text=prompt('Edit entry', entry.text);
   if(text===null) return;
   const trimmed=text.trim();
   if(!trimmed){ toast('Entry text cannot be empty'); return }
-  await fetch(`${API}/diary/${id}`,{method:'PATCH',body:JSON.stringify({text:trimmed}),headers:{'Content-Type':'application/json'}});
+  await fetch(`${API}/${diaryApiPath(kind)}/${id}`,{method:'PATCH',body:JSON.stringify({text:trimmed}),headers:{'Content-Type':'application/json'}});
   await load();
 }
-function renderDiaryInsights(){
-  const wrap=document.getElementById('diary-insights');
-  if(!data.diary.length){ wrap.innerHTML='<div class="empty">No diary entries yet — log a few days and check back here.</div>'; return }
+function renderDiaryInsights(kind){
+  const wrap=document.getElementById(`${diaryPrefix(kind)}-insights`);
+  const list=diaryList(kind);
+  if(!list.length){ wrap.innerHTML='<div class="empty">No diary entries yet — log a few days and check back here.</div>'; return }
   const dayNames=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   const byDay=Array.from({length:7},()=>({total:0,counts:{}}));
-  data.diary.forEach(e=>{
+  list.forEach(e=>{
     const d=parseDate(e.date); if(!d) return;
     const dow=d.getDay();
     byDay[dow].total++;

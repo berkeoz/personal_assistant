@@ -316,6 +316,40 @@ export default async function handler(req, res) {
       return methodNotAllowed("PATCH, DELETE");
     }
 
+    // ── /api/workdiary ─────────────────────────────────
+    // Same shape as /api/diary below, kept as its own resource/array so
+    // work updates never mix with the personal diary log.
+    if (resource === "workdiary") {
+      const data = await loadData();
+      if (!id) {
+        if (req.method !== "POST") return methodNotAllowed("POST");
+        const entry = {
+          id: crypto.randomUUID(),
+          date: (body && body.date) || new Date().toISOString().slice(0, 10),
+          time: (body && body.time) || null,
+          text: (body && body.text) || "",
+          createdAt: new Date().toISOString(),
+        };
+        data.workDiary.push(entry);
+        await saveData(data);
+        return ok(entry);
+      }
+      const entry = data.workDiary.find((d) => d.id === id);
+      if (req.method === "PATCH") {
+        if (!entry) return notFound();
+        Object.assign(entry, body);
+        await saveData(data);
+        return ok(entry);
+      }
+      if (req.method === "DELETE") {
+        if (!entry) return notFound();
+        data.workDiary = data.workDiary.filter((d) => d.id !== id);
+        await saveData(data);
+        return noContent();
+      }
+      return methodNotAllowed("PATCH, DELETE");
+    }
+
     // ── /api/diary ───────────────────────────────────
     // Free-text log entries tied to a specific calendar date (not tasks —
     // just "what I did"). The Diary view groups them by week, and an
