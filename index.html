@@ -362,6 +362,7 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
 .subtask-row{display:flex;align-items:center;gap:6px}
 .subtask-row input[type=text]{flex:1;background:var(--surface3);border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--text);font-size:12px;outline:none}
 .subtask-row input[type=text]:focus{border-color:var(--accent)}
+.subtask-row select{background:var(--surface3);border:1px solid var(--border);border-radius:6px;padding:5px 6px;color:var(--text);font-size:11px;outline:none;max-width:100px}
 .subtask-row button{background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;padding:0 4px}
 .subtask-row button:hover{color:var(--red)}
 .add-subtask-row{display:flex;gap:6px;margin-top:2px}
@@ -2298,20 +2299,28 @@ function addSubtaskInModal(){
 }
 document.addEventListener('keydown',e=>{ if(e.key==='Enter'&&document.activeElement===document.getElementById('mt-subtask-input')) addSubtaskInModal(); });
 
-// Same subtask-editor pattern as personal tasks, mirrored for team tasks.
+// Same subtask-editor pattern as personal tasks, mirrored for team tasks —
+// plus a per-subtask assignee dropdown, since a team task is often split
+// across multiple people who each own one piece of it.
 let tbModalSubtasks=[];
 function renderTbModalSubtasks(){
+  const board=activeTeamBoard();
+  const members=board?.members||[];
   document.getElementById('tbt-subtask-list').innerHTML=tbModalSubtasks.map((s,i)=>`
     <div class="subtask-row">
       <input type="checkbox" ${s.done?'checked':''} onchange="tbModalSubtasks[${i}].done=this.checked"/>
       <input type="text" value="${esc(s.text)}" oninput="tbModalSubtasks[${i}].text=this.value" placeholder="Subtask…"/>
+      <select onchange="tbModalSubtasks[${i}].assigneeId=this.value||null" title="Assign to">
+        <option value="">Unassigned</option>
+        ${members.map(m=>`<option value="${m.id}" ${s.assigneeId===m.id?'selected':''}>${esc(m.name)}</option>`).join('')}
+      </select>
       <button onclick="tbModalSubtasks.splice(${i},1);renderTbModalSubtasks()">×</button>
     </div>`).join('');
 }
 function addTbSubtaskInModal(){
   const inp=document.getElementById('tbt-subtask-input');
   const text=inp.value.trim(); if(!text) return;
-  tbModalSubtasks.push({id:crypto.randomUUID(),text,done:false});
+  tbModalSubtasks.push({id:crypto.randomUUID(),text,done:false,assigneeId:null});
   inp.value=''; renderTbModalSubtasks();
 }
 document.addEventListener('keydown',e=>{ if(e.key==='Enter'&&document.activeElement===document.getElementById('tbt-subtask-input')) addTbSubtaskInModal(); });
