@@ -768,6 +768,18 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
         <button class="btn btn-ghost btn-sm" onclick="hbGridToday()">Today</button>
       </div>
       <div class="hb-grid-wrap" id="hb-grid-wrap"></div>
+
+      <div id="habits-review" style="margin-top:24px">
+        <div class="week-header">
+          <h3 style="font-size:15px;margin:0">📋 Habit Review</h3>
+          <span style="flex:1"></span>
+          <div class="seg-toggle">
+            <button class="btn btn-ghost btn-sm" id="hbr-week-btn" onclick="setHabitReviewUnit('week')">Week</button>
+            <button class="btn btn-ghost btn-sm" id="hbr-month-btn" onclick="setHabitReviewUnit('month')">Month</button>
+          </div>
+        </div>
+        <div id="habits-review-body"></div>
+      </div>
     </div>
     <div id="habits-detail" style="display:none">
       <button class="back-btn" onclick="closeHabitDetail()">← Back to Habits</button>
@@ -3569,7 +3581,68 @@ function renderHabits(){
   document.getElementById('habits-overview').style.display = activeHabitId?'none':'';
   document.getElementById('habits-detail').style.display = activeHabitId?'':'none';
   if(activeHabitId) renderHabitDetail();
-  else renderHabitsGrid();
+  else { renderHabitsGrid(); renderHabitsReview(); }
+}
+
+// ── Habit Review ─────────────────────────────────
+// A standing summary under the grid: per habit, how much of the selected
+// period (week/month) you actually did vs. missed, split into "going
+// well" (>=80% done) and "needs attention" (below), worst-first so the
+// gaps you're most likely to want to fix surface at the top.
+let habitReviewUnit='month';
+function setHabitReviewUnit(u){ habitReviewUnit=u; renderHabitsReview(); }
+function habitReviewStats(h, unit){
+  if(h.schedule?.type==='weekly_count'){
+    const st=habitStatsWeeklyCount(h);
+    const missed=Math.max(0, st.weekTarget-st.weekCount);
+    return { pct: st.weekTarget? Math.min(100, Math.round(st.weekCount/st.weekTarget*100)) : 100, missedCount:missed, lastMissed:null, streak:st.streak, detail:`${st.weekCount}/${st.weekTarget} this week` };
+  }
+  const today=new Date(); today.setHours(0,0,0,0);
+  const start=habitEffectiveStart(h);
+  const rangeStart = unit==='week' ? weekStartOf(today) : new Date(today.getFullYear(), today.getMonth(), 1);
+  let schedCount=0, doneCount=0, missedCount=0, lastMissed=null;
+  for(let d=new Date(rangeStart); d<=today; d.setDate(d.getDate()+1)){
+    if(start && d<start) continue;
+    if(!isHabitScheduledOn(h,d)) continue;
+    const st=habitEntryState(h,isoDate(d));
+    if(st==='skip') continue;
+    schedCount++;
+    if(st==='done') doneCount++;
+    else { missedCount++; lastMissed=new Date(d); }
+  }
+  const pct = schedCount? Math.round(doneCount/schedCount*100) : 100;
+  return { pct, missedCount, lastMissed, streak:habitCurrentStreak(h), detail: schedCount?`${doneCount}/${schedCount} this ${unit}`:'Not scheduled yet' };
+}
+function renderHabitsReview(){
+  const wrap=document.getElementById('habits-review-body'); if(!wrap) return;
+  document.getElementById('hbr-week-btn').classList.toggle('active', habitReviewUnit==='week');
+  document.getElementById('hbr-month-btn').classList.toggle('active', habitReviewUnit==='month');
+  if(!data.habits.length){ wrap.innerHTML='<div class="empty">No habits yet.</div>'; return }
+  const fmtMissed=d=>d?d.toLocaleDateString('en-US',{month:'short',day:'numeric'}):'';
+  const rows=data.habits.map(h=>({h, s:habitReviewStats(h, habitReviewUnit)}));
+  const good=rows.filter(r=>r.s.pct>=80).sort((a,b)=>b.s.pct-a.s.pct);
+  const bad=rows.filter(r=>r.s.pct<80).sort((a,b)=>a.s.pct-b.s.pct);
+  const totalMissed=bad.reduce((sum,r)=>sum+r.s.missedCount,0);
+  wrap.innerHTML = `
+    <div class="hb-stat-row" style="margin-bottom:14px">
+      <div class="hb-stat"><div class="lbl">Habits</div><div class="val">${rows.length}</div></div>
+      <div class="hb-stat"><div class="lbl">Going Well</div><div class="val">${good.length}</div></div>
+      <div class="hb-stat"><div class="lbl">Needs Attention</div><div class="val">${bad.length}</div></div>
+      <div class="hb-stat"><div class="lbl">Missed</div><div class="val">${totalMissed}</div></div>
+    </div>
+    ${bad.length?`<h4 style="margin:4px 0 8px">⚠️ What you've been missing</h4>
+    <div class="diary-insight-list" style="margin-bottom:18px">${bad.map(r=>`
+      <div class="diary-insight-item" style="cursor:pointer" onclick="openHabitDetail('${r.h.id}')" title="Open habit">
+        <span><span class="proj-dot" style="background:${r.h.color};margin-right:6px"></span>${esc(r.h.name)} — ${r.s.detail}</span>
+        <span class="diary-insight-count">${r.s.missedCount?`${r.s.missedCount} missed${r.s.lastMissed?', last '+fmtMissed(r.s.lastMissed):''}`:'—'}</span>
+      </div>`).join('')}</div>`:''}
+    <h4 style="margin:4px 0 8px">✅ What you've been doing</h4>
+    <div class="diary-insight-list">${good.length?good.map(r=>`
+      <div class="diary-insight-item" style="cursor:pointer" onclick="openHabitDetail('${r.h.id}')" title="Open habit">
+        <span><span class="proj-dot" style="background:${r.h.color};margin-right:6px"></span>${esc(r.h.name)} — ${r.s.detail}</span>
+        <span class="diary-insight-count">🔥 ${r.s.streak}</span>
+      </div>`).join(''):'<div class="week-empty">Nothing at 80%+ yet</div>'}</div>
+  `;
 }
 
 // 100% = "Perfect", 80%+ = "Great", below = needs attention.
