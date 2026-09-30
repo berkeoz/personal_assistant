@@ -366,8 +366,7 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
 
 /* Shopping */
 .shopping-item{background:var(--surface2);border-radius:6px;padding:7px 10px;font-size:13px;display:flex;align-items:center;gap:8px;margin-bottom:6px}
-.shopping-item-text{flex:1;cursor:pointer}
-.shopping-item-text:hover{color:var(--accent)}
+.shopping-item-text{flex:1}
 .shopping-item.bought .shopping-item-text{text-decoration:line-through;color:var(--muted)}
 .seg-toggle{display:flex;gap:2px;background:var(--surface2);border-radius:8px;padding:2px}
 .seg-toggle .btn.active{background:var(--accent);color:#fff}
@@ -697,6 +696,7 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
     <div id="shopping-list-mode">
       <div class="add-row">
         <input class="flex1" id="shopping-add-input" type="text" placeholder="Add an item… (Enter)" onkeydown="shoppingQuickAdd(event)"/>
+        <button class="btn btn-primary" onclick="shoppingAddFromButton()">+ Add</button>
       </div>
       <div id="shopping-items"></div>
     </div>
@@ -2624,13 +2624,18 @@ function renderShoppingListMode(){
   wrap.innerHTML = items.map(it=>`
     <div class="shopping-item ${it.bought?'bought':''}">
       <input type="checkbox" ${it.bought?'checked':''} onchange="toggleShoppingBought('${it.id}',this.checked)"/>
-      <span class="shopping-item-text" onclick="editShoppingItem('${it.id}')" title="Click to rename">${esc(it.name)}</span>
-      <button class="task-del" onclick="deleteShoppingItem('${it.id}')">×</button>
+      <span class="shopping-item-text">${esc(it.name)}</span>
+      <button class="btn btn-ghost btn-sm" style="padding:1px 6px" title="Edit" onclick="editShoppingItem('${it.id}')">✏</button>
+      <button class="task-del" title="Remove" onclick="deleteShoppingItem('${it.id}')">×</button>
     </div>`).join('');
 }
 async function shoppingQuickAdd(e){
   if(e.key!=='Enter') return;
-  const inp=e.target; const name=inp.value.trim(); if(!name) return;
+  await shoppingAddFromButton();
+}
+async function shoppingAddFromButton(){
+  const inp=document.getElementById('shopping-add-input');
+  const name=inp.value.trim(); if(!name) return;
   await fetch(`${API}/shopping`,{method:'POST',body:JSON.stringify({name,addedAt:isoDate(new Date())}),headers:{'Content-Type':'application/json'}});
   inp.value=''; await load();
 }
