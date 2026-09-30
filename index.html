@@ -696,12 +696,19 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
     <div id="shopping-list-mode">
       <div class="add-row">
         <input class="flex1" id="shopping-add-input" type="text" placeholder="Add an item… (Enter)" onkeydown="shoppingQuickAdd(event)"/>
+        <select id="shopping-kind-select" style="max-width:140px">
+          <option value="grocery">🛒 Grocery</option>
+          <option value="onetime">🎁 One-time</option>
+          <option value="goal">🎯 Long-term goal</option>
+        </select>
         <button class="btn btn-primary" onclick="shoppingAddFromButton()">+ Add</button>
       </div>
+      <div class="filter-row" id="shopping-kind-filter"></div>
       <div id="shopping-items"></div>
     </div>
 
     <div id="shopping-history-mode" style="display:none">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:6px">🛒 Grocery items only — one-time and goal purchases don't follow a weekly/monthly pattern, so they stay in the List view.</div>
       <div class="week-header">
         <span style="display:flex;align-items:center;gap:10px">
           <button class="week-nav" onclick="shoppingHistNav(-1)">‹</button>
@@ -2599,7 +2606,23 @@ function renderDiaryInsights(kind){
 // (addedAt). History groups that log by week or month to show what was
 // needed vs. actually bought; Insights aggregates it all-time to surface
 // recurring items and ones that tend to get forgotten.
-let shoppingMode='list', shoppingHistOffset=0, shoppingHistUnit='week';
+// Every item also carries a `kind` — grocery (recurring, weekly-ish),
+// onetime (a single splurge) or goal (something to save up for/buy
+// eventually) — so the list isn't just groceries. Recurrence-based
+// History/Insights only make sense for groceries, so those two modes are
+// scoped to kind==='grocery'; the main checklist shows every kind and can
+// be filtered by it.
+const SHOPPING_KIND_META = {
+  grocery: { label:'🛒 Grocery', color:'#6c8eff' },
+  onetime: { label:'🎁 One-time', color:'#f59e0b' },
+  goal:    { label:'🎯 Goal', color:'#34d399' },
+};
+function shoppingKind(it){ return it.kind || 'grocery'; }
+function shoppingKindBadge(kind){
+  const m=SHOPPING_KIND_META[kind]||SHOPPING_KIND_META.grocery;
+  return `<span class="tag" style="background:${m.color};color:#fff">${m.label}</span>`;
+}
+let shoppingMode='list', shoppingHistOffset=0, shoppingHistUnit='week', shoppingKindFilters=new Set();
 function toggleShoppingMode(mode){
   shoppingMode = shoppingMode===mode ? 'list' : mode;
   document.getElementById('shopping-list-mode').style.display = shoppingMode==='list'?'':'none';
@@ -2614,17 +2637,29 @@ function renderShopping(){
   if(shoppingMode==='insights'){ renderShoppingInsights(); return }
   renderShoppingListMode();
 }
+function toggleShoppingKindFilter(kind){
+  if(kind===null) shoppingKindFilters.clear();
+  else if(shoppingKindFilters.has(kind)) shoppingKindFilters.delete(kind);
+  else shoppingKindFilters.add(kind);
+  renderShoppingListMode();
+}
 function renderShoppingListMode(){
+  document.getElementById('shopping-kind-filter').innerHTML = `
+    <button class="chip ${shoppingKindFilters.size===0?'active':''}" onclick="toggleShoppingKindFilter(null)">All</button>
+    ${Object.entries(SHOPPING_KIND_META).map(([k,m])=>`<button class="chip ${shoppingKindFilters.has(k)?'active':''}" onclick="toggleShoppingKindFilter('${k}')">${m.label}</button>`).join('')}`;
   // Only what's still needed — a bought item's job is done and it drops
   // off here (it's still in the permanent log for History/Insights, and
   // fixable from History if checked off by mistake).
-  const items=data.shopping.filter(it=>!it.bought).sort((a,b)=>(a.addedAt||'').localeCompare(b.addedAt||''));
+  let items=data.shopping.filter(it=>!it.bought);
+  if(shoppingKindFilters.size) items=items.filter(it=>shoppingKindFilters.has(shoppingKind(it)));
+  items=items.sort((a,b)=>(a.addedAt||'').localeCompare(b.addedAt||''));
   const wrap=document.getElementById('shopping-items');
   if(!items.length){ wrap.innerHTML='<div class="empty">Nothing on your list yet — add what you need before heading out.</div>'; return }
   wrap.innerHTML = items.map(it=>`
     <div class="shopping-item ${it.bought?'bought':''}">
       <input type="checkbox" ${it.bought?'checked':''} onchange="toggleShoppingBought('${it.id}',this.checked)"/>
       <span class="shopping-item-text">${esc(it.name)}</span>
+      ${shoppingKindBadge(shoppingKind(it))}
       <button class="btn btn-ghost btn-sm" style="padding:1px 6px" title="Edit" onclick="editShoppingItem('${it.id}')">✏</button>
       <button class="task-del" title="Remove" onclick="deleteShoppingItem('${it.id}')">×</button>
     </div>`).join('');
@@ -2636,7 +2671,8 @@ async function shoppingQuickAdd(e){
 async function shoppingAddFromButton(){
   const inp=document.getElementById('shopping-add-input');
   const name=inp.value.trim(); if(!name) return;
-  await fetch(`${API}/shopping`,{method:'POST',body:JSON.stringify({name,addedAt:isoDate(new Date())}),headers:{'Content-Type':'application/json'}});
+  const kind=document.getElementById('shopping-kind-select').value;
+  await fetch(`${API}/shopping`,{method:'POST',body:JSON.stringify({name,kind,addedAt:isoDate(new Date())}),headers:{'Content-Type':'application/json'}});
   inp.value=''; await load();
 }
 async function toggleShoppingBought(id,bought){
@@ -2680,13 +2716,13 @@ function renderShoppingHistory(){
     ? `${fmtShort(start)} – ${fmtShort(end)}, ${end.getFullYear()}`
     : start.toLocaleDateString('en-US',{month:'long',year:'numeric'});
   const startIso=isoDate(start), endIso=isoDate(end);
-  const items=data.shopping.filter(it=>it.addedAt>=startIso && it.addedAt<=endIso);
+  const items=data.shopping.filter(it=>shoppingKind(it)==='grocery' && it.addedAt>=startIso && it.addedAt<=endIso);
   const bought=items.filter(it=>it.bought);
   const notBought=items.filter(it=>!it.bought);
   const today=new Date(); today.setHours(0,0,0,0);
   const isPast=end<today;
   const body=document.getElementById('shopping-hist-body');
-  if(!items.length){ body.innerHTML='<div class="empty">Nothing logged for this period.</div>'; return }
+  if(!items.length){ body.innerHTML='<div class="empty">No grocery items logged for this period. (One-time and goal items don\'t show here — check the List view.)</div>'; return }
   body.innerHTML = `
     <div class="hb-stat-row" style="margin-bottom:14px">
       <div class="hb-stat"><div class="lbl">Needed</div><div class="val">${items.length}</div></div>
@@ -2699,9 +2735,10 @@ function renderShoppingHistory(){
 }
 function renderShoppingInsights(){
   const wrap=document.getElementById('shopping-insights-mode');
-  if(!data.shopping.length){ wrap.innerHTML='<div class="empty">Add and check off a few shopping trips first — insights build up over time.</div>'; return }
+  const groceries=data.shopping.filter(it=>shoppingKind(it)==='grocery');
+  if(!groceries.length){ wrap.innerHTML='<div class="empty">Add and check off a few grocery trips first — insights build up over time. (One-time and goal items are excluded — recurrence patterns don\'t apply to them.)</div>'; return }
   const byName={};
-  data.shopping.forEach(it=>{
+  groceries.forEach(it=>{
     const key=(it.name||'').trim().toLowerCase(); if(!key) return;
     if(!byName[key]) byName[key]={name:it.name, added:0, bought:0};
     byName[key].added++;
@@ -2710,7 +2747,7 @@ function renderShoppingInsights(){
   const all=Object.values(byName);
   const usual=all.filter(x=>x.added>=2).sort((a,b)=>b.added-a.added).slice(0,15);
   const oftenMissed=all.filter(x=>x.added>=2 && (x.bought/x.added)<0.6).sort((a,b)=>(a.bought/a.added)-(b.bought/b.added)).slice(0,10);
-  const activeNames=new Set(data.shopping.filter(it=>!it.bought).map(it=>(it.name||'').trim().toLowerCase()));
+  const activeNames=new Set(groceries.filter(it=>!it.bought).map(it=>(it.name||'').trim().toLowerCase()));
   const suggestions=usual.filter(x=>!activeNames.has(x.name.trim().toLowerCase())).slice(0,10);
   wrap.innerHTML=`
     ${suggestions.length?`<h4 style="margin:4px 0 8px">🔔 Not on your list, but usually bought</h4>

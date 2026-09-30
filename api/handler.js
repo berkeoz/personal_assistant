@@ -361,6 +361,7 @@ export default async function handler(req, res) {
         const item = {
           id: crypto.randomUUID(),
           name: (body && body.name) || "",
+          kind: (body && body.kind) || "grocery",
           addedAt: (body && body.addedAt) || new Date().toISOString().slice(0, 10),
           bought: false,
           boughtAt: null,
