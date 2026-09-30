@@ -2615,8 +2615,10 @@ function renderShopping(){
   renderShoppingListMode();
 }
 function renderShoppingListMode(){
-  const items=[...data.shopping].sort((a,b)=>
-    (a.bought===b.bought?0:a.bought?1:-1) || (a.addedAt||'').localeCompare(b.addedAt||''));
+  // Only what's still needed — a bought item's job is done and it drops
+  // off here (it's still in the permanent log for History/Insights, and
+  // fixable from History if checked off by mistake).
+  const items=data.shopping.filter(it=>!it.bought).sort((a,b)=>(a.addedAt||'').localeCompare(b.addedAt||''));
   const wrap=document.getElementById('shopping-items');
   if(!items.length){ wrap.innerHTML='<div class="empty">Nothing on your list yet — add what you need before heading out.</div>'; return }
   wrap.innerHTML = items.map(it=>`
@@ -2687,7 +2689,7 @@ function renderShoppingHistory(){
       <div class="hb-stat"><div class="lbl">${isPast?'Missed':'Still to buy'}</div><div class="val">${notBought.length}</div></div>
     </div>
     <div class="diary-insight-list">
-      ${items.map(it=>`<div class="diary-insight-item"><span>${it.bought?'✅':(isPast?'❌':'⬜')} ${esc(it.name)}</span></div>`).join('')}
+      ${items.map(it=>`<div class="diary-insight-item" style="cursor:pointer" onclick="toggleShoppingBought('${it.id}',${!it.bought})" title="Click to toggle bought"><span>${it.bought?'✅':(isPast?'❌':'⬜')} ${esc(it.name)}</span></div>`).join('')}
     </div>`;
 }
 function renderShoppingInsights(){
