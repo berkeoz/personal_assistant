@@ -350,6 +350,44 @@ export default async function handler(req, res) {
       return methodNotAllowed("PATCH, DELETE");
     }
 
+    // ── /api/shoppinggroups ────────────────────────────
+    // User-defined categories for shopping items (Grocery/One-time/Goal by
+    // default, but fully editable) — items reference one by id via their
+    // `kind` field. Deleting a group reassigns its items to whatever group
+    // is left, same pattern as deleting a Teams board column.
+    if (resource === "shoppinggroups") {
+      const data = await loadData();
+      if (!id) {
+        if (req.method !== "POST") return methodNotAllowed("POST");
+        const group = {
+          id: crypto.randomUUID(),
+          name: (body && body.name) || "Group",
+          color: (body && body.color) || "#6c8eff",
+          recurring: !!(body && body.recurring),
+        };
+        data.shoppingGroups.push(group);
+        await saveData(data);
+        return ok(group);
+      }
+      const group = data.shoppingGroups.find((g) => g.id === id);
+      if (req.method === "PATCH") {
+        if (!group) return notFound();
+        Object.assign(group, body);
+        await saveData(data);
+        return ok(group);
+      }
+      if (req.method === "DELETE") {
+        if (!group) return notFound();
+        if (data.shoppingGroups.length <= 1) return badRequest("Cannot delete the last group");
+        const fallback = data.shoppingGroups.find((g) => g.id !== id).id;
+        for (const it of data.shopping) if (it.kind === id) it.kind = fallback;
+        data.shoppingGroups = data.shoppingGroups.filter((g) => g.id !== id);
+        await saveData(data);
+        return noContent();
+      }
+      return methodNotAllowed("PATCH, DELETE");
+    }
+
     // ── /api/shopping ────────────────────────────────
     // A running "to buy" checklist plus a permanent log of every item ever
     // added/bought (addedAt/bought/boughtAt), so the frontend can compute

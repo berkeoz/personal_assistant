@@ -708,7 +708,7 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
     </div>
 
     <div id="shopping-history-mode" style="display:none">
-      <div style="font-size:12px;color:var(--muted);margin-bottom:6px">🛒 Grocery items only — one-time and goal purchases don't follow a weekly/monthly pattern, so they stay in the List view.</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:6px">Shows items from groups marked "recurring" only — manage which groups count under ⚙ Groups in the List view.</div>
       <div class="week-header">
         <span style="display:flex;align-items:center;gap:10px">
           <button class="week-nav" onclick="shoppingHistNav(-1)">‹</button>
@@ -1176,6 +1176,20 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
   </div>
 </div>
 
+<!-- Modal: Manage Shopping Groups -->
+<div class="modal-overlay" id="modal-shopping-groups">
+  <div class="modal">
+    <h3>Manage Groups</h3>
+    <div class="field">
+      <div id="shopping-manage-groups" class="subtask-editor"></div>
+      <div class="add-subtask-row"><input id="shopping-new-group" type="text" placeholder="Add group name… (Enter)"/><button class="btn btn-ghost btn-sm" onclick="addShoppingGroup()">+ Add</button></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="closeModal('modal-shopping-groups')">Done</button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal: New Team Column -->
 <div class="modal-overlay" id="modal-tb-col">
   <div class="modal">
@@ -1293,7 +1307,7 @@ function urgencyBadge(u){
   const m=URGENCY_META[u]; if(!m) return '';
   return `<span class="urgency-badge" style="background:${m.color}">${m.label}</span>`;
 }
-let data = { columns: [], projects: [], tasks: [], mindmaps: [], habits: [], recurringEvents: [], diary: [], workDiary: [], shopping: [] };
+let data = { columns: [], projects: [], tasks: [], mindmaps: [], habits: [], recurringEvents: [], diary: [], workDiary: [], shopping: [], shoppingGroups: [] };
 let listFilters = new Set(), kbProjFilters = new Set(), kbPriorityFilters = new Set(), kbSortByPriority = false, kbUrgencyFilters = new Set(), kbSortByUrgency = false, pdFilter = 'all', pdProjectId = null;
 let hiddenCols = new Set();   // column IDs hidden in kanban
 let dragColId = null;         // column being dragged (for reorder)
@@ -1407,6 +1421,7 @@ async function load(){
   if(!data.diary) data.diary=[];
   if(!data.workDiary) data.workDiary=[];
   if(!data.shopping) data.shopping=[];
+  if(!data.shoppingGroups||!data.shoppingGroups.length) data.shoppingGroups=[{id:'grocery',name:'🛒 Grocery',color:'#6c8eff',recurring:true},{id:'onetime',name:'🎁 One-time',color:'#f59e0b',recurring:false},{id:'goal',name:'🎯 Goal',color:'#34d399',recurring:false}];
   hiddenCols = new Set(data.settings.kanbanHiddenCols||[]);
   kbProjFilters = new Set(data.settings.kanbanProjectFilter||[]);
   renderAll();
@@ -2606,22 +2621,19 @@ function renderDiaryInsights(kind){
 // (addedAt). History groups that log by week or month to show what was
 // needed vs. actually bought; Insights aggregates it all-time to surface
 // recurring items and ones that tend to get forgotten.
-// Every item also carries a `kind` — grocery (recurring, weekly-ish),
-// onetime (a single splurge) or goal (something to save up for/buy
-// eventually) — so the list isn't just groceries. Recurrence-based
-// History/Insights only make sense for groceries, so those two modes are
-// scoped to kind==='grocery'; the main checklist shows every kind and can
-// be filtered by it.
-const SHOPPING_KIND_META = {
-  grocery: { label:'🛒 Grocery', color:'#6c8eff' },
-  onetime: { label:'🎁 One-time', color:'#f59e0b' },
-  goal:    { label:'🎯 Goal', color:'#34d399' },
-};
-function shoppingKind(it){ return it.kind || 'grocery'; }
+// Every item also carries a `kind`, referencing one of data.shoppingGroups
+// by id — user-defined categories (Grocery/One-time/Goal by default, but
+// addable/renamable/deletable like Kanban columns). Each group has its own
+// `recurring` flag: only groups marked recurring feed History/Insights,
+// since weekly patterns don't make sense for a one-off splurge or a
+// long-term goal — but the user decides which groups count, not us.
+function shoppingGroupById(id){ return data.shoppingGroups.find(g=>g.id===id) || data.shoppingGroups[0] }
+function shoppingKind(it){ return it.kind || (data.shoppingGroups[0]?.id||'') }
 function shoppingKindBadge(kind){
-  const m=SHOPPING_KIND_META[kind]||SHOPPING_KIND_META.grocery;
-  return `<span class="tag" style="background:${m.color};color:#fff">${m.label}</span>`;
+  const g=shoppingGroupById(kind); if(!g) return '';
+  return `<span class="tag" style="background:${g.color};color:#fff">${esc(g.name)}</span>`;
 }
+function shoppingKindIsRecurring(kind){ const g=shoppingGroupById(kind); return g ? g.recurring!==false : true }
 let shoppingMode='list', shoppingHistOffset=0, shoppingHistUnit='week', shoppingKindFilters=new Set();
 function toggleShoppingMode(mode){
   shoppingMode = shoppingMode===mode ? 'list' : mode;
@@ -2644,9 +2656,11 @@ function toggleShoppingKindFilter(kind){
   renderShoppingListMode();
 }
 function renderShoppingListMode(){
+  document.getElementById('shopping-kind-select').innerHTML = data.shoppingGroups.map(g=>`<option value="${g.id}">${esc(g.name)}</option>`).join('');
   document.getElementById('shopping-kind-filter').innerHTML = `
     <button class="chip ${shoppingKindFilters.size===0?'active':''}" onclick="toggleShoppingKindFilter(null)">All</button>
-    ${Object.entries(SHOPPING_KIND_META).map(([k,m])=>`<button class="chip ${shoppingKindFilters.has(k)?'active':''}" onclick="toggleShoppingKindFilter('${k}')">${m.label}</button>`).join('')}`;
+    ${data.shoppingGroups.map(g=>`<button class="chip ${shoppingKindFilters.has(g.id)?'active':''}" onclick="toggleShoppingKindFilter('${g.id}')">${esc(g.name)}</button>`).join('')}
+    <button class="btn btn-ghost btn-sm" style="margin-left:auto" onclick="openShoppingGroupsModal()">⚙ Groups</button>`;
   // Only what's still needed — a bought item's job is done and it drops
   // off here (it's still in the permanent log for History/Insights, and
   // fixable from History if checked off by mistake).
@@ -2716,13 +2730,13 @@ function renderShoppingHistory(){
     ? `${fmtShort(start)} – ${fmtShort(end)}, ${end.getFullYear()}`
     : start.toLocaleDateString('en-US',{month:'long',year:'numeric'});
   const startIso=isoDate(start), endIso=isoDate(end);
-  const items=data.shopping.filter(it=>shoppingKind(it)==='grocery' && it.addedAt>=startIso && it.addedAt<=endIso);
+  const items=data.shopping.filter(it=>shoppingKindIsRecurring(shoppingKind(it)) && it.addedAt>=startIso && it.addedAt<=endIso);
   const bought=items.filter(it=>it.bought);
   const notBought=items.filter(it=>!it.bought);
   const today=new Date(); today.setHours(0,0,0,0);
   const isPast=end<today;
   const body=document.getElementById('shopping-hist-body');
-  if(!items.length){ body.innerHTML='<div class="empty">No grocery items logged for this period. (One-time and goal items don\'t show here — check the List view.)</div>'; return }
+  if(!items.length){ body.innerHTML='<div class="empty">No recurring-group items logged for this period. (Non-recurring groups don\'t show here — check the List view, or mark a group recurring under ⚙ Groups.)</div>'; return }
   body.innerHTML = `
     <div class="hb-stat-row" style="margin-bottom:14px">
       <div class="hb-stat"><div class="lbl">Needed</div><div class="val">${items.length}</div></div>
@@ -2735,8 +2749,8 @@ function renderShoppingHistory(){
 }
 function renderShoppingInsights(){
   const wrap=document.getElementById('shopping-insights-mode');
-  const groceries=data.shopping.filter(it=>shoppingKind(it)==='grocery');
-  if(!groceries.length){ wrap.innerHTML='<div class="empty">Add and check off a few grocery trips first — insights build up over time. (One-time and goal items are excluded — recurrence patterns don\'t apply to them.)</div>'; return }
+  const groceries=data.shopping.filter(it=>shoppingKindIsRecurring(shoppingKind(it)));
+  if(!groceries.length){ wrap.innerHTML='<div class="empty">Add and check off a few trips in a recurring group first — insights build up over time. (Non-recurring groups are excluded — mark a group recurring under ⚙ Groups if you want it tracked here.)</div>'; return }
   const byName={};
   groceries.forEach(it=>{
     const key=(it.name||'').trim().toLowerCase(); if(!key) return;
@@ -2757,6 +2771,49 @@ function renderShoppingInsights(){
     <h4 style="margin:4px 0 8px">⚠️ Often missed</h4>
     <div class="diary-insight-list">${oftenMissed.length?oftenMissed.map(x=>`<div class="diary-insight-item"><span>${esc(x.name)}</span><span class="diary-insight-count">${x.bought}/${x.added} bought</span></div>`).join(''):'<div class="week-empty">Nothing standing out yet</div>'}</div>
   `;
+}
+
+// ── Manage Shopping Groups (add/rename/toggle-recurring/delete) ──
+function openShoppingGroupsModal(){ renderShoppingGroupsModal(); openModal('modal-shopping-groups'); }
+function renderShoppingGroupsModal(){
+  document.getElementById('shopping-manage-groups').innerHTML = data.shoppingGroups.map(g=>`
+    <div class="subtask-row">
+      <span class="proj-dot" style="background:${g.color}"></span>
+      <span style="flex:1;font-size:13px">${esc(g.name)}</span>
+      <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--muted);cursor:pointer" title="Track this group in History/Insights">
+        <input type="checkbox" ${g.recurring?'checked':''} onchange="toggleShoppingGroupRecurring('${g.id}',this.checked)"/> Recurring
+      </label>
+      <button onclick="renameShoppingGroup('${g.id}')" title="Rename">✏</button>
+      <button onclick="deleteShoppingGroup('${g.id}')" title="Delete">×</button>
+    </div>`).join('');
+}
+async function addShoppingGroup(){
+  const input=document.getElementById('shopping-new-group');
+  const name=input.value.trim(); if(!name) return;
+  const color=COLORS[data.shoppingGroups.length % COLORS.length];
+  await fetch(`${API}/shoppinggroups`,{method:'POST',body:JSON.stringify({name,color}),headers:{'Content-Type':'application/json'}});
+  input.value='';
+  await load(); renderShoppingGroupsModal(); toast('Group added');
+}
+document.getElementById('shopping-new-group').addEventListener('keydown',e=>{ if(e.key==='Enter') addShoppingGroup() });
+async function renameShoppingGroup(id){
+  const g=shoppingGroupById(id); if(!g) return;
+  const name=prompt('Rename group',g.name); if(!name||!name.trim()||name.trim()===g.name) return;
+  await fetch(`${API}/shoppinggroups/${id}`,{method:'PATCH',body:JSON.stringify({name:name.trim()}),headers:{'Content-Type':'application/json'}});
+  await load(); renderShoppingGroupsModal(); toast('Group renamed');
+}
+async function toggleShoppingGroupRecurring(id,recurring){
+  await fetch(`${API}/shoppinggroups/${id}`,{method:'PATCH',body:JSON.stringify({recurring}),headers:{'Content-Type':'application/json'}});
+  await load(); renderShoppingGroupsModal();
+}
+async function deleteShoppingGroup(id){
+  if(data.shoppingGroups.length<=1){ toast('Cannot delete the last group'); return }
+  const g=shoppingGroupById(id);
+  const cnt=data.shopping.filter(it=>shoppingKind(it)===id).length;
+  const msg=cnt?`Delete "${g?.name}" and move ${cnt} item(s) to another group?`:`Delete group "${g?.name}"?`;
+  if(!confirm(msg)) return;
+  await fetch(`${API}/shoppinggroups/${id}`,{method:'DELETE'});
+  await load(); renderShoppingGroupsModal(); toast('Group deleted');
 }
 
 // ── ICS Import ─────────────────────────────────
