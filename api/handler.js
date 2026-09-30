@@ -350,6 +350,41 @@ export default async function handler(req, res) {
       return methodNotAllowed("PATCH, DELETE");
     }
 
+    // ── /api/shopping ────────────────────────────────
+    // A running "to buy" checklist plus a permanent log of every item ever
+    // added/bought (addedAt/bought/boughtAt), so the frontend can compute
+    // weekly/monthly history and recurring-item insights from one array.
+    if (resource === "shopping") {
+      const data = await loadData();
+      if (!id) {
+        if (req.method !== "POST") return methodNotAllowed("POST");
+        const item = {
+          id: crypto.randomUUID(),
+          name: (body && body.name) || "",
+          addedAt: (body && body.addedAt) || new Date().toISOString().slice(0, 10),
+          bought: false,
+          boughtAt: null,
+        };
+        data.shopping.push(item);
+        await saveData(data);
+        return ok(item);
+      }
+      const item = data.shopping.find((s) => s.id === id);
+      if (req.method === "PATCH") {
+        if (!item) return notFound();
+        Object.assign(item, body);
+        await saveData(data);
+        return ok(item);
+      }
+      if (req.method === "DELETE") {
+        if (!item) return notFound();
+        data.shopping = data.shopping.filter((s) => s.id !== id);
+        await saveData(data);
+        return noContent();
+      }
+      return methodNotAllowed("PATCH, DELETE");
+    }
+
     // ── /api/diary ───────────────────────────────────
     // Free-text log entries tied to a specific calendar date (not tasks —
     // just "what I did"). The Diary view groups them by week, and an
