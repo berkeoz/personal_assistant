@@ -350,6 +350,41 @@ export default async function handler(req, res) {
       return methodNotAllowed("PATCH, DELETE");
     }
 
+    // ── /api/savings ─────────────────────────────────
+    // One entry per deposit toward savings (amount/note/date). The frontend
+    // computes daily/weekly totals and running sums straight from this
+    // list, so no aggregates are stored server-side.
+    if (resource === "savings") {
+      const data = await loadData();
+      if (!id) {
+        if (req.method !== "POST") return methodNotAllowed("POST");
+        const entry = {
+          id: crypto.randomUUID(),
+          amount: Number(body && body.amount) || 0,
+          note: (body && body.note) || "",
+          date: (body && body.date) || new Date().toISOString().slice(0, 10),
+          createdAt: new Date().toISOString(),
+        };
+        data.savings.push(entry);
+        await saveData(data);
+        return ok(entry);
+      }
+      const entry = data.savings.find((s) => s.id === id);
+      if (req.method === "PATCH") {
+        if (!entry) return notFound();
+        Object.assign(entry, body);
+        await saveData(data);
+        return ok(entry);
+      }
+      if (req.method === "DELETE") {
+        if (!entry) return notFound();
+        data.savings = data.savings.filter((s) => s.id !== id);
+        await saveData(data);
+        return noContent();
+      }
+      return methodNotAllowed("PATCH, DELETE");
+    }
+
     // ── /api/shoppinggroups ────────────────────────────
     // User-defined categories for shopping items (Grocery/One-time/Goal by
     // default, but fully editable) — items reference one by id via their
