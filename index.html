@@ -481,6 +481,7 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
   <button class="nav-btn" onclick="switchView('workdiary',this)" data-view="workdiary"><span class="ic">💼</span> Work Diary</button>
   <button class="nav-btn" onclick="switchView('shopping',this)" data-view="shopping"><span class="ic">🛒</span> Shopping</button>
   <button class="nav-btn" onclick="switchView('savings',this)" data-view="savings"><span class="ic">💰</span> Savings</button>
+  <button class="nav-btn" onclick="switchView('meals',this)" data-view="meals"><span class="ic">🍽</span> Meals</button>
   <button class="nav-btn" onclick="switchView('history',this)" data-view="history"><span class="ic">🕘</span> History</button>
   <button class="nav-btn" onclick="switchView('teams',this)" data-view="teams"><span class="ic">👥</span> Teams</button>
   <button class="nav-btn" onclick="openImportModal()" style="color:var(--accent2)"><span class="ic">📥</span> Import .ics</button>
@@ -727,6 +728,51 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
     </div>
 
     <div id="shopping-insights-mode" style="display:none"></div>
+  </div>
+
+  <!-- Meals -->
+  <div class="view" id="view-meals">
+    <div class="week-header">
+      <h2 style="font-size:18px;margin:0">🍽 Meals</h2>
+      <span style="flex:1"></span>
+      <button class="btn btn-ghost btn-sm" id="meals-patterns-btn" onclick="toggleMealsMode()">📊 Patterns</button>
+    </div>
+
+    <div id="meals-week-mode">
+      <div class="add-row">
+        <select id="meal-type" style="max-width:130px">
+          <option value="breakfast">🥣 Breakfast</option>
+          <option value="lunch">🥪 Lunch</option>
+          <option value="dinner">🍝 Dinner</option>
+          <option value="snack">🍎 Snack</option>
+        </select>
+        <input id="meal-time" type="time" style="max-width:130px"/>
+        <input id="meal-date" type="date"/>
+        <input class="flex1" id="meal-text" type="text" placeholder="What did you eat? (optional)" onkeydown="if(event.key==='Enter')addMealEntry()"/>
+        <button class="btn btn-primary" onclick="addMealEntry()">+ Add</button>
+      </div>
+      <div class="week-header" style="margin-top:14px">
+        <span style="display:flex;align-items:center;gap:10px">
+          <button class="week-nav" onclick="mealsNav(-1)">‹</button>
+          <h3 id="meals-title"></h3>
+          <button class="week-nav" onclick="mealsNav(1)">›</button>
+          <button class="week-today-btn" onclick="mealsToday()">This Week</button>
+        </span>
+      </div>
+      <div class="week-grid" id="meals-grid"></div>
+    </div>
+
+    <div id="meals-patterns-mode" style="display:none">
+      <div class="week-header">
+        <span style="font-size:12px;color:var(--muted)">Looking back over the</span>
+        <div class="seg-toggle">
+          <button class="btn btn-ghost btn-sm" id="meals-range-14" onclick="setMealsRange(14)">2 weeks</button>
+          <button class="btn btn-ghost btn-sm" id="meals-range-30" onclick="setMealsRange(30)">30 days</button>
+          <button class="btn btn-ghost btn-sm" id="meals-range-90" onclick="setMealsRange(90)">90 days</button>
+        </div>
+      </div>
+      <div id="meals-patterns-body"></div>
+    </div>
   </div>
 
   <!-- Savings -->
@@ -1357,7 +1403,7 @@ function urgencyBadge(u){
   const m=URGENCY_META[u]; if(!m) return '';
   return `<span class="urgency-badge" style="background:${m.color}">${m.label}</span>`;
 }
-let data = { columns: [], projects: [], tasks: [], mindmaps: [], habits: [], recurringEvents: [], diary: [], workDiary: [], shopping: [], shoppingGroups: [], savings: [] };
+let data = { columns: [], projects: [], tasks: [], mindmaps: [], habits: [], recurringEvents: [], diary: [], workDiary: [], shopping: [], shoppingGroups: [], savings: [], meals: [] };
 let listFilters = new Set(), kbProjFilters = new Set(), kbPriorityFilters = new Set(), kbSortByPriority = false, kbUrgencyFilters = new Set(), kbSortByUrgency = false, pdFilter = 'all', pdProjectId = null;
 let hiddenCols = new Set();   // column IDs hidden in kanban
 let dragColId = null;         // column being dragged (for reorder)
@@ -1473,6 +1519,7 @@ async function load(){
   if(!data.shopping) data.shopping=[];
   if(!data.shoppingGroups||!data.shoppingGroups.length) data.shoppingGroups=[{id:'grocery',name:'🛒 Grocery',color:'#6c8eff',recurring:true},{id:'onetime',name:'🎁 One-time',color:'#f59e0b',recurring:false},{id:'goal',name:'🎯 Goal',color:'#34d399',recurring:false}];
   if(!data.savings) data.savings=[];
+  if(!data.meals) data.meals=[];
   hiddenCols = new Set(data.settings.kanbanHiddenCols||[]);
   kbProjFilters = new Set(data.settings.kanbanProjectFilter||[]);
   renderAll();
@@ -1529,6 +1576,7 @@ function renderView(name){
   else if(name==='workdiary') renderDiary('work');
   else if(name==='shopping') renderShopping();
   else if(name==='savings') renderSavings();
+  else if(name==='meals') renderMeals();
   else if(name==='history') renderHistory();
   else if(name==='teams') renderTeams();
 }
@@ -2973,6 +3021,162 @@ function renderSavingsBreakdown(){
         <span>${fmtDate(e.date)} — ${esc(e.note||'(no note)')}</span>
         <span class="diary-insight-count">${fmtMoney(e.amount)}</span>
       </div>`).join('')}</div>` : '<div class="empty">Nothing saved in this period.</div>'}
+  `;
+}
+
+// ── Meals ──────────────────────────────────────
+// One entry per meal eaten (type/time/date/optional text). The week grid
+// is for logging as you go; Patterns crunches the log to show when you
+// actually tend to eat — average time per meal, how consistent it is,
+// weekday-by-weekday differences, and which meals get skipped.
+const MEAL_TYPES = {
+  breakfast:{ label:'Breakfast', icon:'🥣' },
+  lunch:{ label:'Lunch', icon:'🥪' },
+  dinner:{ label:'Dinner', icon:'🍝' },
+  snack:{ label:'Snack', icon:'🍎' },
+};
+let mealsWeekOffset=0, mealsPatternsOn=false, mealsRange=30;
+function mealToMin(hhmm){ const [h,m]=hhmm.split(':').map(Number); return h*60+m }
+function mealFmtMin(min){
+  const t=Math.round(min); const h=Math.floor(t/60)%24, m=t%60;
+  return fmtTimeOnly(`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`);
+}
+function mealsNav(dir){ mealsWeekOffset+=dir; renderMeals(); }
+function mealsToday(){ mealsWeekOffset=0; renderMeals(); }
+function toggleMealsMode(){
+  mealsPatternsOn=!mealsPatternsOn;
+  document.getElementById('meals-patterns-btn').classList.toggle('active',mealsPatternsOn);
+  document.getElementById('meals-week-mode').style.display=mealsPatternsOn?'none':'';
+  document.getElementById('meals-patterns-mode').style.display=mealsPatternsOn?'':'none';
+  renderMeals();
+}
+function setMealsRange(n){ mealsRange=n; renderMeals(); }
+function renderMeals(){
+  if(mealsPatternsOn){ renderMealsPatterns(); return }
+  const now=new Date();
+  const dateInput=document.getElementById('meal-date');
+  if(!dateInput.value) dateInput.value=isoDate(now);
+  const timeInput=document.getElementById('meal-time');
+  if(!timeInput.value) timeInput.value=`${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+  const mon=diaryWeekStart(mealsWeekOffset);
+  const sun=new Date(mon); sun.setDate(sun.getDate()+6);
+  document.getElementById('meals-title').textContent=
+    mon.toLocaleDateString('en-US',{month:'short',day:'numeric'})+' – '+
+    sun.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+  const todayStr=isoDate(now);
+  const dayNames=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  document.getElementById('meals-grid').innerHTML=dayNames.map((dayName,i)=>{
+    const d=new Date(mon); d.setDate(d.getDate()+i);
+    const dateStr=isoDate(d);
+    const entries=data.meals.filter(e=>e.date===dateStr).sort((a,b)=>a.time.localeCompare(b.time));
+    return `<div class="week-col ${dateStr===todayStr?'is-today':''}">
+      <div class="week-col-header"><div class="week-col-day">${dayName}</div><div class="week-col-date">${d.getDate()}</div></div>
+      <div class="week-col-tasks">
+        ${entries.length?entries.map(e=>{
+          const t=MEAL_TYPES[e.type]||MEAL_TYPES.snack;
+          return `<div class="diary-entry">
+            <span class="diary-entry-text" onclick="editMealEntry('${e.id}')" title="Click to edit"><b>${fmtTimeOnly(e.time)}</b> ${t.icon} ${esc(e.text||t.label)}</span>
+            <button class="task-del" onclick="deleteMealEntry('${e.id}')">×</button>
+          </div>`;}).join(''):`<div class="week-empty">—</div>`}
+      </div>
+    </div>`;
+  }).join('');
+}
+async function addMealEntry(){
+  const type=document.getElementById('meal-type').value;
+  const time=document.getElementById('meal-time').value;
+  if(!time){ toast('Pick a time'); return }
+  const date=document.getElementById('meal-date').value || isoDate(new Date());
+  const text=document.getElementById('meal-text').value.trim();
+  await fetch(`${API}/meals`,{method:'POST',body:JSON.stringify({type,time,date,text}),headers:{'Content-Type':'application/json'}});
+  document.getElementById('meal-text').value='';
+  document.getElementById('meal-time').value='';
+  await load();
+}
+async function deleteMealEntry(id){
+  await fetch(`${API}/meals/${id}`,{method:'DELETE'});
+  await load();
+}
+async function editMealEntry(id){
+  const entry=data.meals.find(e=>e.id===id); if(!entry) return;
+  const text=prompt('What did you eat? (optional)', entry.text||'');
+  if(text===null) return;
+  const time=prompt('Time (HH:MM, 24-hour)', entry.time);
+  if(time===null) return;
+  if(!/^([01]?\d|2[0-3]):[0-5]\d$/.test(time.trim())){ toast('Time must look like 13:30'); return }
+  const [h,m]=time.trim().split(':');
+  await fetch(`${API}/meals/${id}`,{method:'PATCH',body:JSON.stringify({text:text.trim(),time:`${h.padStart(2,'0')}:${m}`}),headers:{'Content-Type':'application/json'}});
+  await load();
+}
+function mealsAvgSd(mins){
+  const avg=mins.reduce((a,b)=>a+b,0)/mins.length;
+  const sd=Math.sqrt(mins.reduce((a,b)=>a+(b-avg)**2,0)/mins.length);
+  return {avg,sd};
+}
+function renderMealsPatterns(){
+  [14,30,90].forEach(n=>document.getElementById('meals-range-'+n).classList.toggle('active',mealsRange===n));
+  const wrap=document.getElementById('meals-patterns-body');
+  if(!data.meals.length){ wrap.innerHTML='<div class="empty">Log a few meals first — patterns show up once there\'s some history.</div>'; return }
+  const today=new Date(); today.setHours(0,0,0,0);
+  const rangeStart=new Date(today); rangeStart.setDate(rangeStart.getDate()-mealsRange+1);
+  const firstLogged=parseDate(data.meals.map(e=>e.date).sort()[0]);
+  // Don't count days before tracking began as "skipped".
+  const start=firstLogged>rangeStart?firstLogged:rangeStart;
+  const startIso=isoDate(start), endIso=isoDate(today);
+  const inRange=data.meals.filter(e=>e.date>=startIso&&e.date<=endIso);
+  const totalDays=Math.round((today-start)/86400000)+1;
+  if(!inRange.length){ wrap.innerHTML='<div class="empty">No meals logged in this range.</div>'; return }
+
+  const spreadLabel=sd=>sd<=30?'very consistent':sd<=60?'fairly consistent':'all over the place';
+  const typeRows=Object.keys(MEAL_TYPES).map(k=>{
+    const list=inRange.filter(e=>e.type===k);
+    if(!list.length) return null;
+    const mins=list.map(e=>mealToMin(e.time));
+    const {avg,sd}=mealsAvgSd(mins);
+    const daysLogged=new Set(list.map(e=>e.date)).size;
+    return { k, count:list.length, avg, sd, earliest:Math.min(...mins), latest:Math.max(...mins), daysLogged };
+  }).filter(Boolean);
+
+  const mainTypes=['breakfast','lunch','dinner'];
+  const skipped=mainTypes.map(k=>{
+    const have=new Set(inRange.filter(e=>e.type===k).map(e=>e.date));
+    return { k, missed: totalDays-have.size };
+  }).filter(s=>s.missed>0).sort((a,b)=>b.missed-a.missed);
+
+  const byDay=new Map();
+  inRange.forEach(e=>{ if(!byDay.has(e.date)) byDay.set(e.date,[]); byDay.get(e.date).push(mealToMin(e.time)); });
+  const firsts=[...byDay.values()].map(a=>Math.min(...a)), lasts=[...byDay.values()].map(a=>Math.max(...a));
+  const firstAvg=firsts.reduce((a,b)=>a+b,0)/firsts.length, lastAvg=lasts.reduce((a,b)=>a+b,0)/lasts.length;
+  const windowHrs=((lastAvg-firstAvg)/60).toFixed(1);
+
+  const dow=[1,2,3,4,5,6,0], dowNames={1:'Mon',2:'Tue',3:'Wed',4:'Thu',5:'Fri',6:'Sat',0:'Sun'};
+  const dowCell=(k,d)=>{
+    const l=inRange.filter(e=>e.type===k && parseDate(e.date).getDay()===d);
+    return l.length?mealFmtMin(l.reduce((a,e)=>a+mealToMin(e.time),0)/l.length):'—';
+  };
+
+  wrap.innerHTML=`
+    <div class="hb-stat-row" style="margin-bottom:14px">
+      <div class="hb-stat"><div class="lbl">Meals logged</div><div class="val">${inRange.length}</div></div>
+      <div class="hb-stat"><div class="lbl">Days tracked</div><div class="val">${byDay.size}/${totalDays}</div></div>
+      <div class="hb-stat"><div class="lbl">First meal (avg)</div><div class="val" style="font-size:16px">${mealFmtMin(firstAvg)}</div></div>
+      <div class="hb-stat"><div class="lbl">Last meal (avg)</div><div class="val" style="font-size:16px">${mealFmtMin(lastAvg)}</div></div>
+      <div class="hb-stat"><div class="lbl">Eating window</div><div class="val" style="font-size:16px">${windowHrs}h</div></div>
+    </div>
+    <h4 style="margin:4px 0 8px">⏰ When you usually eat</h4>
+    <div class="diary-insight-list" style="margin-bottom:18px">${typeRows.map(r=>`
+      <div class="diary-insight-item" title="Earliest ${mealFmtMin(r.earliest)}, latest ${mealFmtMin(r.latest)}">
+        <span>${MEAL_TYPES[r.k].icon} ${MEAL_TYPES[r.k].label} — around <b>${mealFmtMin(r.avg)}</b> (${spreadLabel(r.sd)}, ±${Math.round(r.sd)} min)</span>
+        <span class="diary-insight-count">${mealFmtMin(r.earliest)} – ${mealFmtMin(r.latest)}</span>
+      </div>`).join('')}</div>
+    <h4 style="margin:4px 0 8px">📅 By day of week (average time)</h4>
+    <div style="overflow-x:auto;margin-bottom:18px"><table class="hb-grid" style="min-width:480px">
+      <thead><tr><th></th>${dow.map(d=>`<th>${dowNames[d]}</th>`).join('')}</tr></thead>
+      <tbody>${mainTypes.map(k=>`<tr><td class="hb-row-name" style="cursor:default">${MEAL_TYPES[k].icon} ${MEAL_TYPES[k].label}</td>${dow.map(d=>`<td style="font-size:11px;text-align:center">${dowCell(k,d)}</td>`).join('')}</tr>`).join('')}</tbody>
+    </table></div>
+    <h4 style="margin:4px 0 8px">⚠️ Skipped or unlogged</h4>
+    <div class="diary-insight-list">${skipped.length?skipped.map(s=>`
+      <div class="diary-insight-item"><span>${MEAL_TYPES[s.k].icon} ${MEAL_TYPES[s.k].label}</span><span class="diary-insight-count">no entry on ${s.missed} of ${totalDays} days</span></div>`).join(''):'<div class="week-empty">Every breakfast, lunch and dinner is logged — nice.</div>'}</div>
   `;
 }
 

@@ -350,6 +350,45 @@ export default async function handler(req, res) {
       return methodNotAllowed("PATCH, DELETE");
     }
 
+    // ── /api/meals ───────────────────────────────────
+    // One entry per meal eaten (type/time/date/text). Pattern analysis
+    // (average times, consistency, skipped meals) is computed on the
+    // frontend from this list.
+    if (resource === "meals") {
+      const data = await loadData();
+      if (!id) {
+        if (req.method !== "POST") return methodNotAllowed("POST");
+        const type = ["breakfast", "lunch", "dinner", "snack"].includes(body && body.type) ? body.type : "snack";
+        const time = body && /^([01]\d|2[0-3]):[0-5]\d$/.test(body.time) ? body.time : null;
+        if (!time) return badRequest("time must be HH:MM");
+        const entry = {
+          id: crypto.randomUUID(),
+          type,
+          time,
+          date: (body && body.date) || new Date().toISOString().slice(0, 10),
+          text: (body && body.text) || "",
+          createdAt: new Date().toISOString(),
+        };
+        data.meals.push(entry);
+        await saveData(data);
+        return ok(entry);
+      }
+      const entry = data.meals.find((m) => m.id === id);
+      if (req.method === "PATCH") {
+        if (!entry) return notFound();
+        Object.assign(entry, body);
+        await saveData(data);
+        return ok(entry);
+      }
+      if (req.method === "DELETE") {
+        if (!entry) return notFound();
+        data.meals = data.meals.filter((m) => m.id !== id);
+        await saveData(data);
+        return noContent();
+      }
+      return methodNotAllowed("PATCH, DELETE");
+    }
+
     // ── /api/savings ─────────────────────────────────
     // One entry per deposit toward savings (amount/note/date). The frontend
     // computes daily/weekly totals and running sums straight from this
