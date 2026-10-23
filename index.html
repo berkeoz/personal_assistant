@@ -997,6 +997,7 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
     </div>
     <div class="field"><label>Notes</label><textarea id="mt-notes" rows="3" placeholder="Add notes, links, details…" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--text);font-size:13px;outline:none;resize:vertical;font-family:inherit;transition:border-color .15s"></textarea></div>
     <div class="modal-actions">
+      <button class="btn btn-danger" style="margin-right:auto" onclick="deleteTaskFromModal()">Delete</button>
       <button class="btn btn-ghost" onclick="closeModal('modal-task')">Cancel</button>
       <button class="btn btn-primary" onclick="saveEditTask()">Save</button>
     </div>
@@ -1334,6 +1335,7 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
     </div>
     <div class="field"><label>Notes</label><textarea id="tbt-notes" rows="3" placeholder="Add notes, links, details…" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--text);font-size:13px;outline:none;resize:vertical;font-family:inherit;transition:border-color .15s"></textarea></div>
     <div class="modal-actions">
+      <button class="btn btn-danger" id="tbt-delete-btn" style="margin-right:auto" onclick="deleteTbTaskFromModal()">Delete</button>
       <button class="btn btn-ghost" onclick="closeModal('modal-tb-task')">Cancel</button>
       <button class="btn btn-primary" onclick="saveTbTask()">Save</button>
     </div>
@@ -1646,6 +1648,12 @@ async function toggleTask(id){
   await patchTask(id, { status: isCompleted(t) ? firstCol.id : doneCol.id });
 }
 async function confirmDel(id){ if(confirm('Delete this task?')){ await delTask(id); toast('Deleted') } }
+async function deleteTaskFromModal(){
+  if(!editingTaskId) return;
+  if(!confirm('Delete this task? This cannot be undone.')) return;
+  await delTask(editingTaskId);
+  closeModal('modal-task'); toast('Deleted');
+}
 
 // ── All Tasks ──────────────────────────────────
 // Multiple filters can be active at once (e.g. Todo + In Progress) — a task
@@ -2474,7 +2482,7 @@ document.addEventListener('keydown',e=>{ if(e.key==='Enter'&&document.activeElem
 let tbModalSubtasks=[];
 function renderTbModalSubtasks(){
   const board=activeTeamBoard();
-  const members=board?.members||[];
+  const members=(board?.members||[]).filter(m=>!m.archived||tbModalSubtasks.some(s=>s.assigneeId===m.id));
   document.getElementById('tbt-subtask-list').innerHTML=tbModalSubtasks.map((s,i)=>`
     <div class="subtask-row">
       <input type="checkbox" ${s.done?'checked':''} onchange="tbModalSubtasks[${i}].done=this.checked"/>
@@ -4364,7 +4372,7 @@ function renderTbBoard(){
 
   document.getElementById('tb-assignee-row').innerHTML = `<span class="kb-toolbar-label">Assignee:</span>
     <button class="chip ${tbAssigneeFilters.size===0?'active':''}" onclick="toggleTbAssigneeFilter(null)">All</button>
-    ${board.members.map(m=>`<button class="chip ${tbAssigneeFilters.has(m.id)?'active':''}" onclick="toggleTbAssigneeFilter('${m.id}')"><span class="proj-dot" style="background:${m.color}"></span> ${esc(m.name)}</button>`).join('')}`;
+    ${board.members.filter(m=>!m.archived).map(m=>`<button class="chip ${tbAssigneeFilters.has(m.id)?'active':''}" onclick="toggleTbAssigneeFilter('${m.id}')"><span class="proj-dot" style="background:${m.color}"></span> ${esc(m.name)}</button>`).join('')}`;
 
   document.getElementById('tb-project-row').innerHTML = `<span class="kb-toolbar-label">Project:</span>
     <button class="chip ${tbProjFilters.size===0?'active':''}" onclick="toggleTbProjFilter(null)">All</button>
@@ -4591,7 +4599,7 @@ function openManageTeamModal(){ renderManageTeamModal(); openModal('modal-tb-man
 function renderManageTeamModal(){
   const board=activeTeamBoard(); if(!board) return;
   document.getElementById('tb-manage-members').innerHTML = board.members.length ? board.members.map(m=>`
-    <div class="subtask-row"><span class="proj-dot" style="background:${m.color}"></span><span style="flex:1;font-size:13px">${esc(m.name)}</span><button onclick="renameTbMember('${m.id}')" title="Rename">✏</button><button onclick="removeTbMember('${m.id}')" title="Remove">×</button></div>`).join('') : `<div style="font-size:12px;color:var(--muted)">No members yet.</div>`;
+    <div class="subtask-row"><span class="proj-dot" style="background:${m.color}"></span><span style="flex:1;font-size:13px${m.archived?';color:var(--muted)':''}">${esc(m.name)}${m.archived?' (archived)':''}</span><button onclick="renameTbMember('${m.id}')" title="Rename">✏</button><button onclick="toggleTbMemberArchived('${m.id}')" title="${m.archived?'Restore':'Archive — hide from new assignments, keep on existing tasks'}">${m.archived?'⤴':'🗄'}</button><button onclick="removeTbMember('${m.id}')" title="Delete permanently (unassigns their tasks)">×</button></div>`).join('') : `<div style="font-size:12px;color:var(--muted)">No members yet.</div>`;
   document.getElementById('tb-manage-projects').innerHTML = board.projects.length ? board.projects.map(p=>`
     <div class="subtask-row"><span class="proj-dot" style="background:${p.color}"></span><span style="flex:1;font-size:13px${p.archived?';color:var(--muted)':''}">${esc(p.name)}${p.archived?' (archived)':''}</span><button onclick="renameTbProject('${p.id}')" title="Rename">✏</button><button onclick="toggleTbProjectArchived('${p.id}')" title="${p.archived?'Restore':'Archive'}">${p.archived?'⤴':'🗄'}</button><button onclick="removeTbProject('${p.id}')" title="Remove">×</button></div>`).join('') : `<div style="font-size:12px;color:var(--muted)">No projects yet.</div>`;
 }
@@ -4621,8 +4629,13 @@ async function addTbMember(){
   await load(); renderManageTeamModal(); toast('Member added');
 }
 document.getElementById('tb-new-member').addEventListener('keydown',e=>{ if(e.key==='Enter') addTbMember() });
+async function toggleTbMemberArchived(id){
+  const board=activeTeamBoard(); const m=tbMemberById(board,id); if(!m) return;
+  await fetch(`${API}/teamboards/${board.id}/members/${id}`,{method:'PATCH',body:JSON.stringify({archived:!m.archived}),headers:{'Content-Type':'application/json'}});
+  await load(); renderManageTeamModal(); toast(m.archived?'Member restored':'Member archived');
+}
 async function removeTbMember(id){
-  if(!confirm('Remove this team member? Their tasks will become unassigned.')) return;
+  if(!confirm('Permanently delete this team member? They will be removed from every task they are assigned to (including finished ones).\n\nTo keep your tasks as they are, cancel and use the archive button (🗄) instead.')) return;
   const board=activeTeamBoard();
   await fetch(`${API}/teamboards/${board.id}/members/${id}`,{method:'DELETE'});
   await load(); renderManageTeamModal(); toast('Member removed');
@@ -4638,7 +4651,7 @@ async function addTbProject(){
 }
 document.getElementById('tb-new-project').addEventListener('keydown',e=>{ if(e.key==='Enter') addTbProject() });
 async function removeTbProject(id){
-  if(!confirm('Delete this project?')) return;
+  if(!confirm('Permanently delete this project? It will be removed from every task it is on (including finished ones).\n\nTo keep your tasks as they are, cancel and use the archive button (🗄) instead.')) return;
   const board=activeTeamBoard();
   await fetch(`${API}/teamboards/${board.id}/projects/${id}`,{method:'DELETE'});
   await load(); renderManageTeamModal(); toast('Project deleted');
@@ -4649,12 +4662,13 @@ function openNewTbTaskModal(){
   const board=activeTeamBoard();
   if(!board){ toast('Create a team board first'); return }
   editingTbTaskId=null;
+  document.getElementById('tbt-delete-btn').style.display='none';
   document.getElementById('tbt-title').textContent='New Task';
   document.getElementById('tbt-text').value='';
   document.getElementById('tbt-status').innerHTML=board.columns.map((c,i)=>`<option value="${c.id}" ${i===0?'selected':''}>${esc(c.name)}</option>`).join('');
   document.getElementById('tbt-priority').value='';
   document.getElementById('tbt-urgency').value='';
-  document.getElementById('tbt-assignee-list').innerHTML=board.members.length ? board.members.map(m=>`
+  document.getElementById('tbt-assignee-list').innerHTML=board.members.length ? board.members.filter(m=>!m.archived).map(m=>`
     <label class="proj-check-item"><input type="checkbox" value="${m.id}" ${tbAssigneeFilters.has(m.id)?'checked':''}/><span class="proj-dot" style="background:${m.color}"></span>${esc(m.name)}</label>`).join('') : `<div style="font-size:12px;color:var(--muted)">No members yet — add one via Manage Team.</div>`;
   document.getElementById('tbt-due').value='';
   document.getElementById('tbt-notes').value='';
@@ -4667,13 +4681,14 @@ function openNewTbTaskModal(){
 function openEditTbTask(id){
   const board=activeTeamBoard(); const t=board.tasks.find(x=>x.id===id); if(!t) return;
   editingTbTaskId=id;
+  document.getElementById('tbt-delete-btn').style.display='';
   document.getElementById('tbt-title').textContent='Edit Task';
   document.getElementById('tbt-text').value=t.text||'';
   document.getElementById('tbt-status').innerHTML=board.columns.map(c=>`<option value="${c.id}" ${t.status===c.id?'selected':''}>${esc(c.name)}</option>`).join('');
   document.getElementById('tbt-priority').value=t.priority||'';
   document.getElementById('tbt-urgency').value=t.urgency||'';
-  document.getElementById('tbt-assignee-list').innerHTML=board.members.length ? board.members.map(m=>`
-    <label class="proj-check-item"><input type="checkbox" value="${m.id}" ${(t.assigneeIds||[]).includes(m.id)?'checked':''}/><span class="proj-dot" style="background:${m.color}"></span>${esc(m.name)}</label>`).join('') : `<div style="font-size:12px;color:var(--muted)">No members yet — add one via Manage Team.</div>`;
+  document.getElementById('tbt-assignee-list').innerHTML=board.members.length ? board.members.filter(m=>!m.archived||(t.assigneeIds||[]).includes(m.id)).map(m=>`
+    <label class="proj-check-item"><input type="checkbox" value="${m.id}" ${(t.assigneeIds||[]).includes(m.id)?'checked':''}/><span class="proj-dot" style="background:${m.color}"></span>${esc(m.name)}${m.archived?' (archived)':''}</label>`).join('') : `<div style="font-size:12px;color:var(--muted)">No members yet — add one via Manage Team.</div>`;
   document.getElementById('tbt-due').value=t.dueDate?t.dueDate.slice(0,10):'';
   document.getElementById('tbt-notes').value=t.notes||'';
   document.getElementById('tbt-proj-list').innerHTML=board.projects.length ? board.projects.filter(p=>!p.archived||(t.projectIds||[]).includes(p.id)).map(p=>`
@@ -4709,6 +4724,11 @@ async function confirmDelTbTask(id){
   const board=activeTeamBoard();
   await fetch(`${API}/teamboards/${board.id}/tasks/${id}`,{method:'DELETE'});
   await load(); toast('Deleted');
+}
+async function deleteTbTaskFromModal(){
+  if(!editingTbTaskId) return;
+  await confirmDelTbTask(editingTbTaskId);
+  if(!activeTeamBoard()?.tasks.some(t=>t.id===editingTbTaskId)) closeModal('modal-tb-task');
 }
 
 // ── Team History ───────────────────────────────────
